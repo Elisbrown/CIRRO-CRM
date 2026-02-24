@@ -1,0 +1,349 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ──────────────────────────────────────────────
+
+enum Department {
+  OFFIZONE
+  JOYSUN
+  ADMIN
+}
+
+enum SystemRole {
+  SUPER_ADMIN
+  OPERATIONS_MANAGER
+  SALES_REP
+  ASSISTANT
+}
+
+enum ContactType {
+  LEAD
+  CUSTOMER
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  CONVERTED
+  LOST
+}
+
+enum SupplierCategory {
+  RAW_MATERIALS
+  PRINTING_PARTNER
+  MAINTENANCE
+  CLEANING_SUPPLIES
+  OTHER
+}
+
+enum BusinessUnit {
+  OFFIZONE
+  JOYSUN
+}
+
+enum ExecutionType {
+  IN_HOUSE
+  OUTSOURCED
+  HYBRID
+}
+
+enum ServiceRequestStatus {
+  DRAFT
+  APPROVED
+  IN_PROGRESS
+  COMPLETED
+  CANCELED
+}
+
+enum ReferralType {
+  STAFF
+  CONTACT
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskStatus {
+  TODO
+  DOING
+  BLOCKED
+  DONE
+}
+
+enum MachineStatus {
+  OPERATIONAL
+  NEEDS_PARTS
+  DOWN
+}
+
+enum CleaningZone {
+  JOYSUN_FLOOR
+  OFFIZONE_MAIN
+  BATHROOMS
+  OTHER
+}
+
+enum CleaningResult {
+  PASS
+  FAIL
+}
+
+enum MaintenanceStatus {
+  OPERATIONAL
+  NEEDS_PARTS
+  DOWN
+}
+
+enum StaffStatus {
+  ACTIVE
+  INACTIVE
+}
+
+// ─── Models ─────────────────────────────────────────────
+
+model Staff {
+  id           Int          @id @default(autoincrement())
+  staffId      String       @unique @map("staff_id") // E-001
+  firstName    String       @map("first_name")
+  lastName     String       @map("last_name")
+  email        String       @unique
+  phone        String?
+  department   Department
+  role         SystemRole   @default(ASSISTANT)
+  status       StaffStatus  @default(ACTIVE)
+  passwordHash String       @map("password_hash")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  assignedContacts Contact[]       @relation("AssignedRep")
+  assignedTasks    Task[]          @relation("TaskAssignee")
+  cleaningLogs     CleaningLog[]
+  activities       Activity[]
+
+  @@map("staff")
+}
+
+model Contact {
+  id          Int          @id @default(autoincrement())
+  clientId    String       @unique @map("client_id") // C-0001
+  type        ContactType  @default(LEAD)
+  companyName String?      @map("company_name")
+  firstName   String       @map("first_name")
+  lastName    String       @map("last_name")
+  phone       String?
+  email       String?
+  city        String?
+  country     String?
+  leadSource  String?      @map("lead_source")
+  status      LeadStatus   @default(NEW)
+  assignedTo  Int?         @map("assigned_to")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  assignedRep     Staff?           @relation("AssignedRep", fields: [assignedTo], references: [id])
+  serviceRequests ServiceRequest[]
+  activities      Activity[]
+
+  @@index([email])
+  @@index([phone])
+  @@index([status])
+  @@map("contacts")
+}
+
+model Supplier {
+  id          Int              @id @default(autoincrement())
+  name        String
+  category    SupplierCategory
+  contactName String?          @map("contact_name")
+  phone       String?
+  email       String?
+  bankDetails String?          @map("bank_details") @db.Text
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  // Relations
+  serviceRequests ServiceRequest[]
+
+  @@map("suppliers")
+}
+
+model Catalog {
+  id           Int          @id @default(autoincrement())
+  businessUnit BusinessUnit @map("business_unit")
+  serviceName  String       @map("service_name")
+  basePrice    Decimal      @map("base_price") @db.Decimal(12, 2)
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  serviceRequests ServiceRequest[]
+
+  @@map("catalog")
+}
+
+model Machine {
+  id                  Int           @id @default(autoincrement())
+  name                String
+  model               String?
+  status              MachineStatus @default(OPERATIONAL)
+  lastMaintenanceDate DateTime?     @map("last_maintenance_date")
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  serviceRequests  ServiceRequest[]
+  maintenanceLogs  MaintenanceLog[]
+
+  @@map("machines")
+}
+
+model ServiceRequest {
+  id             Int                  @id @default(autoincrement())
+  requestId      String               @unique @map("request_id") // SR-0001
+  contactId      Int                  @map("contact_id")
+  businessUnit   BusinessUnit         @map("business_unit")
+  serviceId      Int?                 @map("service_id")
+  executionType  ExecutionType        @default(IN_HOUSE) @map("execution_type")
+  machineId      Int?                 @map("machine_id")
+  supplierId     Int?                 @map("supplier_id")
+  referralId     Int?                 @map("referral_id")
+  referralType   ReferralType?        @map("referral_type")
+  quotedAmount   Decimal?             @map("quoted_amount") @db.Decimal(12, 2)
+  finalAmount    Decimal?             @map("final_amount") @db.Decimal(12, 2)
+  supplyCost     Decimal              @default(0) @map("supply_cost") @db.Decimal(12, 2)
+  outsourceCost  Decimal              @default(0) @map("outsource_cost") @db.Decimal(12, 2)
+  laborCost      Decimal              @default(0) @map("labor_cost") @db.Decimal(12, 2)
+  status         ServiceRequestStatus @default(DRAFT)
+  notes          String?              @db.Text
+  deliveryDate   DateTime?            @map("delivery_date")
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+
+  // Print job–specific fields (JOYSUN)
+  paperSize      String?              @map("paper_size")    // A4, A3, A2, Custom
+  colorMode      String?              @map("color_mode")    // CMYK, BW, Spot
+  quantity       Int?                 @default(1)
+  finishType     String?              @map("finish_type")   // Lamination, Binding, Folding, None
+
+  // Relations
+  contact     Contact          @relation(fields: [contactId], references: [id])
+  service     Catalog?         @relation(fields: [serviceId], references: [id])
+  machine     Machine?         @relation(fields: [machineId], references: [id])
+  supplier    Supplier?        @relation(fields: [supplierId], references: [id])
+  attachments FileAttachment[]
+
+  @@index([status])
+  @@index([businessUnit])
+  @@index([contactId])
+  @@map("service_requests")
+}
+
+model FileAttachment {
+  id               Int      @id @default(autoincrement())
+  serviceRequestId Int      @map("service_request_id")
+  fileName         String   @map("file_name")
+  fileUrl          String   @map("file_url")
+  fileSize         Int      @map("file_size") // bytes
+  mimeType         String   @map("mime_type")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  // Relations
+  serviceRequest ServiceRequest @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
+
+  @@index([serviceRequestId])
+  @@map("file_attachments")
+}
+
+model Task {
+  id              Int          @id @default(autoincrement())
+  title           String
+  description     String?      @db.Text
+  assignedTo      Int?         @map("assigned_to")
+  priority        TaskPriority @default(MEDIUM)
+  status          TaskStatus   @default(TODO)
+  dueDate         DateTime?    @map("due_date")
+  relatedRecordId Int?         @map("related_record_id")
+  relatedType     String?      @map("related_type") // "Contact" | "ServiceRequest"
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  assignee Staff?        @relation("TaskAssignee", fields: [assignedTo], references: [id])
+  comments TaskComment[]
+
+  @@index([status])
+  @@index([assignedTo])
+  @@map("tasks")
+}
+
+model TaskComment {
+  id        Int      @id @default(autoincrement())
+  taskId    Int      @map("task_id")
+  authorId  Int      @map("author_id")
+  content   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@map("task_comments")
+}
+
+model CleaningLog {
+  id             Int            @id @default(autoincrement())
+  staffId        Int            @map("staff_id")
+  zone           CleaningZone
+  result         CleaningResult @default(PASS)
+  grade          Int            @default(3) // 1-5
+  deduction      Decimal        @default(0) @db.Decimal(12, 2)
+  inspectorNotes String?        @map("inspector_notes") @db.Text
+  createdAt      DateTime       @default(now()) @map("created_at")
+
+  // Relations
+  cleaner Staff @relation(fields: [staffId], references: [id])
+
+  @@map("cleaning_logs")
+}
+
+model MaintenanceLog {
+  id        Int               @id @default(autoincrement())
+  machineId Int               @map("machine_id")
+  action    String            @db.Text
+  cost      Decimal           @default(0) @db.Decimal(12, 2)
+  status    MaintenanceStatus @default(OPERATIONAL)
+  createdAt DateTime          @default(now()) @map("created_at")
+
+  // Relations
+  machine Machine @relation(fields: [machineId], references: [id])
+
+  @@map("maintenance_logs")
+}
+
+model Activity {
+  id         Int      @id @default(autoincrement())
+  type       String   // "email", "call", "note", "status_change"
+  content    String   @db.Text
+  contactId  Int?     @map("contact_id")
+  staffId    Int?     @map("staff_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relations
+  contact Contact? @relation(fields: [contactId], references: [id])
+  staff   Staff?   @relation(fields: [staffId], references: [id])
+
+  @@index([contactId])
+  @@map("activities")
+}
