@@ -16,30 +16,36 @@ export async function GET(_req: NextRequest, context: RouteContext) {
     const { id } = await context.params;
     const staff = await db.staff.findUnique({
       where: { id: parseInt(id) },
-      select: {
-        id: true,
-        staffId: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        phone: true,
-        department: true,
-        role: true,
-        status: true,
-        createdAt: true,
-        updatedAt: true,
+      include: {
         _count: {
           select: {
             assignedContacts: true,
             assignedTasks: true,
-            cleaningLogs: true,
           },
         },
       },
     });
 
     if (!staff) return apiError("Staff not found", 404);
-    return apiSuccess(staff);
+
+    const completedTasksCount = await db.task.count({
+      where: { 
+        assignedTo: parseInt(id),
+        status: "DONE"
+      }
+    });
+
+    const performanceRate = staff._count.assignedTasks > 0 
+      ? Math.round((completedTasksCount / staff._count.assignedTasks) * 100) 
+      : 0;
+
+    const { passwordHash, ...staffInfo } = staff;
+
+    return apiSuccess({
+      ...staffInfo,
+      completedTasksCount,
+      performanceRate,
+    });
   } catch (error) {
     return handleValidationError(error);
   }

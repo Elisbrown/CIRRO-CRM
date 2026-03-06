@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useUIStore } from "@/stores/ui-store";
 import {
-  BarChart3,
+  Building2,
   CheckSquare,
   ChevronLeft,
   ChevronRight,
@@ -16,10 +16,12 @@ import {
   Home,
   Kanban,
   LayoutDashboard,
+  MessageSquare,
   Printer,
   Settings,
   ShoppingBag,
   Truck,
+  User,
   Users,
   UserSquare,
   Wrench,
@@ -35,44 +37,52 @@ interface NavItem {
 interface NavGroup {
   label: string;
   items: NavItem[];
+  roles?: string[]; // Group-level role restriction
 }
 
 const NAV_GROUPS: NavGroup[] = [
   {
     label: "Overview",
     items: [
-      { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
+      { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["MANAGER", "ACCOUNTANT"] },
     ],
   },
   {
     label: "CRM",
     items: [
-      { label: "Contacts", href: "/contacts", icon: Users, roles: ["SUPER_ADMIN", "OPERATIONS_MANAGER", "SALES_REP"] },
-      { label: "Service Requests", href: "/service-requests", icon: FileText, roles: ["SUPER_ADMIN", "OPERATIONS_MANAGER", "SALES_REP"] },
-      { label: "Workflow Board", href: "/kanban", icon: Kanban, roles: ["SUPER_ADMIN", "OPERATIONS_MANAGER", "SALES_REP"] },
+      { label: "Contacts", href: "/contacts", icon: Users },
+      { label: "Service Requests", href: "/service-requests", icon: FileText },
+      { label: "Workflow Board", href: "/kanban", icon: Kanban },
+      { label: "Messages", href: "/messages", icon: MessageSquare },
     ],
   },
   {
     label: "Operations",
     items: [
       { label: "Tasks", href: "/tasks", icon: CheckSquare },
-      { label: "Suppliers", href: "/suppliers", icon: Truck, roles: ["SUPER_ADMIN", "OPERATIONS_MANAGER"] },
-      { label: "Catalog", href: "/catalog", icon: ShoppingBag, roles: ["SUPER_ADMIN", "OPERATIONS_MANAGER", "SALES_REP"] },
-      { label: "Machines", href: "/machines", icon: Printer, roles: ["SUPER_ADMIN", "OPERATIONS_MANAGER"] },
+      { label: "Suppliers", href: "/suppliers", icon: Truck },
+      { label: "Catalog", href: "/catalog", icon: ShoppingBag },
+      { label: "Machines", href: "/machines", icon: Printer, roles: ["MANAGER"] },
     ],
   },
   {
     label: "Facility",
     items: [
-      { label: "Cleaning Logs", href: "/cleaning", icon: Droplets, roles: ["SUPER_ADMIN", "OPERATIONS_MANAGER", "ASSISTANT"] },
-      { label: "Maintenance", href: "/maintenance", icon: Wrench, roles: ["SUPER_ADMIN", "OPERATIONS_MANAGER", "ASSISTANT"] },
+      { label: "Maintenance", href: "/maintenance", icon: Wrench },
+      { label: "Rent Tracking", href: "/rent", icon: Building2 },
     ],
   },
   {
     label: "HR & Admin",
+    roles: ["MANAGER"],
     items: [
-      { label: "Staff", href: "/staff", icon: UserSquare, roles: ["SUPER_ADMIN", "OPERATIONS_MANAGER"] },
-      { label: "Settings", href: "/settings", icon: Settings, roles: ["SUPER_ADMIN"] },
+      { label: "Staff", href: "/staff", icon: UserSquare, roles: ["MANAGER"] },
+    ],
+  },
+  {
+    label: "Account",
+    items: [
+      { label: "My Profile", href: "/profile", icon: User },
     ],
   },
 ];
@@ -81,7 +91,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const { sidebarOpen, toggleSidebar, setSidebarOpen } = useUIStore();
-  const userRole = session?.user?.role || "ASSISTANT";
+  const userRole = session?.user?.role || "STAFF";
 
   // Close sidebar on mobile by default after mounting
   useEffect(() => {
@@ -109,22 +119,20 @@ export function Sidebar() {
       )}
 
       <aside
-        className={`fixed left-0 top-0 z-50 h-screen border-r border-gray-200 bg-white transition-all duration-300 ease-in-out ${
-          sidebarOpen 
-            ? "w-64 translate-x-0" 
+        className={`fixed left-0 top-0 z-50 h-screen flex flex-col border-r border-gray-200 bg-white transition-all duration-300 ease-in-out ${sidebarOpen
+            ? "w-64 translate-x-0"
             : "w-[68px] -translate-x-full md:translate-x-0 md:w-[68px]"
-        }`}
+          }`}
       >
         {/* Logo */}
         <div className="flex h-16 items-center border-b border-gray-200 px-4 overflow-hidden">
-          <Link href="/dashboard" className="flex items-center shrink-0">
+          <Link href={userRole === "STAFF" ? "/tasks" : "/dashboard"} className="flex items-center shrink-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/logo.png"
               alt="Cirronyx"
-              className={`h-8 object-contain object-left transition-all duration-300 ${
-                sidebarOpen ? "w-[120px]" : "w-[32px]"
-              }`}
+              className={`h-8 object-contain object-left transition-all duration-300 ${sidebarOpen ? "w-[120px]" : "w-[32px]"
+                }`}
             />
           </Link>
         </div>
@@ -132,6 +140,9 @@ export function Sidebar() {
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto px-3 py-4">
           {NAV_GROUPS.map((group) => {
+            // Group-level role restriction
+            if (group.roles && !group.roles.includes(userRole)) return null;
+
             const visibleItems = group.items.filter(
               (item) => !item.roles || item.roles.includes(userRole)
             );
@@ -155,17 +166,15 @@ export function Sidebar() {
                           onClick={() => {
                             if (window.innerWidth < 768) toggleSidebar();
                           }}
-                          className={`group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                            isActive
+                          className={`group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${isActive
                               ? "bg-black text-white"
                               : "text-gray-600 hover:bg-gray-100 hover:text-black"
-                          }`}
+                            }`}
                           title={!sidebarOpen ? item.label : undefined}
                         >
                           <Icon
-                            className={`h-5 w-5 shrink-0 ${
-                              isActive ? "text-white" : "text-gray-400 group-hover:text-black"
-                            }`}
+                            className={`h-5 w-5 shrink-0 ${isActive ? "text-white" : "text-gray-400 group-hover:text-black"
+                              }`}
                           />
                           <span className={`transition-opacity duration-300 ${sidebarOpen ? "opacity-100" : "opacity-0 md:hidden"}`}>
                             {item.label}

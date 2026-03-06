@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { 
-  CreateStaffInput, UpdateStaffInput, 
+import type {
+  CreateStaffInput, UpdateStaffInput,
   CreateContactInput, UpdateContactInput,
   CreateServiceRequestInput, UpdateServiceRequestInput,
   CreateSupplierInput, UpdateSupplierInput,
@@ -8,8 +8,12 @@ import type {
   CreateMachineInput, UpdateMachineInput,
   CreateTaskInput, UpdateTaskInput,
   CreateTaskCommentInput,
-  CreateCleaningLogInput, UpdateCleaningLogInput,
-  CreateMaintenanceLogInput, UpdateMaintenanceLogInput
+  CreateSubTaskInput, UpdateSubTaskInput,
+  CreateMaintenanceLogInput, UpdateMaintenanceLogInput,
+  CreateRentalSpaceInput, UpdateRentalSpaceInput,
+  CreateRentPaymentInput,
+  CreateContactAttachmentInput,
+  UpdateProfileInput,
 } from "@/lib/validations";
 
 /**
@@ -20,6 +24,15 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
     ...options,
     headers: { "Content-Type": "application/json", ...options?.headers },
   });
+
+  const contentType = res.headers.get("content-type");
+  if (!contentType || !contentType.includes("application/json")) {
+    const text = await res.text();
+    const snippet = text.slice(0, 100).replace(/<[^>]*>/g, "").trim();
+    console.error(`[API Error] ${res.status} Expected JSON, got ${contentType}:`, text.slice(0, 200));
+    throw new Error(`Server error (${res.status}): ${snippet || "Invalid response format"}`);
+  }
+
   const json = await res.json();
   if (!json.success) throw new Error(json.error || "Request failed");
   return json.data;
@@ -42,11 +55,17 @@ interface StaffListItem {
   department: string;
   role: string;
   status: string;
+  avatarUrl: string | null;
   createdAt: string;
 }
 
 interface StaffDetail extends StaffListItem {
   updatedAt: string;
+  avatarUrl: string | null;
+  bio: string | null;
+  address: string | null;
+  completedTasksCount: number;
+  performanceRate: number;
   _count: {
     assignedContacts: number;
     assignedTasks: number;
@@ -129,6 +148,7 @@ interface ContactListItem {
 }
 
 interface ContactDetail extends ContactListItem {
+  notes: string | null;
   updatedAt: string;
   serviceRequests: Array<{
     id: number;
@@ -291,7 +311,7 @@ export function useDeleteServiceRequest() {
   });
 }
 
-// ─── Lookup Hooks (Catalog, Machines, Contacts for dropdowns) ───
+// ─── Lookup Hooks ───────────────────────────────────────
 
 export function useCatalogList() {
   return useQuery<Array<{ id: number; serviceName: string; businessUnit: string; basePrice: number }>>({
@@ -430,9 +450,11 @@ interface TaskListItem {
   dueDate: string | null;
   relatedRecordId: number | null;
   relatedType: string | null;
+  isRecurring: boolean;
   createdAt: string;
   assignee: { id: number; firstName: string; lastName: string } | null;
-  _count: { comments: number };
+  creator: { id: number; firstName: string; lastName: string } | null;
+  _count: { comments: number; subTasks: number; attachments: number };
 }
 
 interface TaskComment {
@@ -441,10 +463,27 @@ interface TaskComment {
   authorId: number;
   content: string;
   createdAt: string;
+  author: { firstName: string; lastName: string } | null;
 }
 
 interface TaskDetail extends TaskListItem {
+  approvedById: number | null;
+  approvedAt: string | null;
+  completedAt: string | null;
+  recurringInterval: string | null;
+  recurringDays: number | null;
+  approver: { id: number; firstName: string; lastName: string } | null;
   comments: TaskComment[];
+  subTasks: Array<{ id: number; taskId: number; title: string; isCompleted: boolean; sortOrder: number }>;
+  attachments: Array<{
+    id: number; fileName: string; fileUrl: string; fileSize: number; mimeType: string;
+    uploadedBy: { id: number; firstName: string; lastName: string } | null;
+    createdAt: string;
+  }>;
+  logs: Array<{
+    id: number; action: string; details: string | null; createdAt: string;
+    performedBy: { id: number; firstName: string; lastName: string } | null;
+  }>;
 }
 
 export function useTasksList(params: {
@@ -452,6 +491,7 @@ export function useTasksList(params: {
   limit?: number;
   search?: string;
   status?: string;
+  priority?: string;
   assignedTo?: number;
   relatedRecordId?: number;
   relatedType?: string;
@@ -463,6 +503,7 @@ export function useTasksList(params: {
   if (params.limit) qs.set("limit", String(params.limit));
   if (params.search) qs.set("search", params.search);
   if (params.status) qs.set("status", params.status);
+  if (params.priority) qs.set("priority", params.priority);
   if (params.assignedTo) qs.set("assignedTo", String(params.assignedTo));
   if (params.relatedRecordId) qs.set("relatedRecordId", String(params.relatedRecordId));
   if (params.relatedType) qs.set("relatedType", params.relatedType);
@@ -524,81 +565,99 @@ export function useCreateTaskComment(taskId: number) {
   });
 }
 
+// ─── Sub-Tasks Hooks ────────────────────────────────────
+
+export function useCreateSubTask(taskId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateSubTaskInput) =>
+      apiFetch(`/api/tasks/${taskId}/subtasks`, { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks", taskId] }),
+  });
+}
+
+export function useUpdateSubTask(taskId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: UpdateSubTaskInput & { subtaskId: number }) =>
+      apiFetch(`/api/tasks/${taskId}/subtasks`, { method: "PUT", body: JSON.stringify(data) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks", taskId] }),
+  });
+}
+
+export function useDeleteSubTask(taskId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (subtaskId: number) =>
+      apiFetch(`/api/tasks/${taskId}/subtasks?subtaskId=${subtaskId}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks", taskId] }),
+  });
+}
+
+// ─── Task Attachments Hooks ─────────────────────────────
+export function useUploadTaskAttachment(taskId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const CHUNK_SIZE = 512 * 1024; // 512KB
+      const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+      const uploadId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+      let lastResponse: any = null;
+
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, file.size);
+        const chunk = file.slice(start, end);
+
+        const formData = new FormData();
+        formData.append("chunk", new File([chunk], file.name, { type: file.type }));
+        formData.append("chunkIndex", i.toString());
+        formData.append("totalChunks", totalChunks.toString());
+        formData.append("fileName", file.name);
+        formData.append("taskId", taskId.toString());
+        formData.append("uploadId", uploadId);
+
+        const res = await fetch(`/api/uploads/chunk`, { method: "POST", body: formData });
+
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          const text = await res.text();
+          const snippet = text.slice(0, 100).replace(/<[^>]*>/g, "").trim();
+          throw new Error(`Upload failed (${res.status}): ${snippet || "Invalid server response"}`);
+        }
+
+        const json = await res.json();
+        if (!json.success) throw new Error(json.error || `Chunk ${i + 1}/${totalChunks} failed`);
+
+        lastResponse = json.data;
+      }
+
+      return lastResponse;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks", taskId] }),
+  });
+}
+
+export function useDeleteTaskAttachment(taskId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (attachmentId: number) =>
+      apiFetch(`/api/tasks/${taskId}/attachments?attachmentId=${attachmentId}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks", taskId] }),
+  });
+}
+
 // ─── Dashboard Hooks ────────────────────────────────────
 
 export function useDashboardStats() {
   return useQuery({
     queryKey: ["dashboard-stats"],
     queryFn: () => apiFetch<any>("/api/dashboard/stats"),
-    staleTime: 60 * 1000, // 1 minute cache
+    staleTime: 60 * 1000,
   });
 }
 
-// ─── Cleaning Logs Hooks ────────────────────────────────
-
-interface CleaningLogListItem {
-  id: number;
-  staffId: number;
-  zone: string;
-  result: string;
-  grade: number;
-  deduction: number;
-  inspectorNotes: string | null;
-  createdAt: string;
-  cleaner: { id: number; firstName: string; lastName: string };
-}
-
-export function useCleaningLogsList(params: {
-  page?: number;
-  limit?: number;
-  zone?: string;
-  staffId?: number;
-  sortBy?: string;
-  sortOrder?: string;
-}) {
-  const qs = new URLSearchParams();
-  if (params.page) qs.set("page", String(params.page));
-  if (params.limit) qs.set("limit", String(params.limit));
-  if (params.zone) qs.set("zone", params.zone);
-  if (params.staffId) qs.set("staffId", String(params.staffId));
-  if (params.sortBy) qs.set("sortBy", params.sortBy);
-  if (params.sortOrder) qs.set("sortOrder", params.sortOrder);
-
-  return useQuery<PaginatedResponse<CleaningLogListItem>>({
-    queryKey: ["cleaning-logs", params],
-    queryFn: () => apiFetch(`/api/cleaning?${qs}`),
-  });
-}
-
-export function useCreateCleaningLog() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (data: CreateCleaningLogInput) =>
-      apiFetch("/api/cleaning", { method: "POST", body: JSON.stringify(data) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["cleaning-logs"] }),
-  });
-}
-
-export function useUpdateCleaningLog(id: number) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (data: UpdateCleaningLogInput) =>
-      apiFetch(`/api/cleaning/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["cleaning-logs"] });
-      qc.invalidateQueries({ queryKey: ["cleaning-logs", id] });
-    },
-  });
-}
-
-export function useDeleteCleaningLog() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (id: number) =>
-      apiFetch(`/api/cleaning/${id}`, { method: "DELETE" }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["cleaning-logs"] }),
-  });
-}
 
 // ─── Maintenance Logs Hooks ─────────────────────────────
 
@@ -662,5 +721,160 @@ export function useDeleteMaintenanceLog() {
     mutationFn: (id: number) =>
       apiFetch(`/api/maintenance/${id}`, { method: "DELETE" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["maintenance-logs"] }),
+  });
+}
+
+// ─── Rent Hooks ─────────────────────────────────────────
+
+export function useRentalSpaces(params: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: string;
+  sortBy?: string;
+  sortOrder?: string;
+}) {
+  const qs = new URLSearchParams();
+  if (params.page) qs.set("page", String(params.page));
+  if (params.limit) qs.set("limit", String(params.limit));
+  if (params.search) qs.set("search", params.search);
+  if (params.status) qs.set("status", params.status);
+  if (params.sortBy) qs.set("sortBy", params.sortBy);
+  if (params.sortOrder) qs.set("sortOrder", params.sortOrder);
+
+  return useQuery<PaginatedResponse<any>>({
+    queryKey: ["rental-spaces", params],
+    queryFn: () => apiFetch(`/api/rent/spaces?${qs}`),
+  });
+}
+
+export function useRentalSpaceDetail(id: number | null) {
+  return useQuery({
+    queryKey: ["rental-spaces", id],
+    queryFn: () => apiFetch(`/api/rent/spaces/${id}`),
+    enabled: !!id,
+  });
+}
+
+export function useCreateRentalSpace() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateRentalSpaceInput) =>
+      apiFetch("/api/rent/spaces", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["rental-spaces"] }),
+  });
+}
+
+export function useUpdateRentalSpace(id: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: UpdateRentalSpaceInput) =>
+      apiFetch(`/api/rent/spaces/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["rental-spaces"] }),
+  });
+}
+
+export function useDeleteRentalSpace() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) =>
+      apiFetch(`/api/rent/spaces/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["rental-spaces"] }),
+  });
+}
+
+export function useRentPayments(params: { spaceId?: number; page?: number; limit?: number }) {
+  const qs = new URLSearchParams();
+  if (params.spaceId) qs.set("spaceId", String(params.spaceId));
+  if (params.page) qs.set("page", String(params.page));
+  if (params.limit) qs.set("limit", String(params.limit));
+
+  return useQuery<PaginatedResponse<any>>({
+    queryKey: ["rent-payments", params],
+    queryFn: () => apiFetch(`/api/rent/payments?${qs}`),
+  });
+}
+
+export function useCreateRentPayment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateRentPaymentInput) =>
+      apiFetch("/api/rent/payments", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["rent-payments"] });
+      qc.invalidateQueries({ queryKey: ["rental-spaces"] });
+    },
+  });
+}
+
+// ─── Staff Performance Hook ────────────────────────────
+
+export function useStaffPerformance() {
+  return useQuery<any[]>({
+    queryKey: ["staff-performance"],
+    queryFn: () => apiFetch("/api/staff/performance"),
+    staleTime: 60 * 1000,
+  });
+}
+
+// ─── Profile Hooks ──────────────────────────────────────
+
+export function useProfile() {
+  return useQuery({
+    queryKey: ["profile"],
+    queryFn: () => apiFetch<any>("/api/profile"),
+  });
+}
+
+export function useUpdateProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: UpdateProfileInput) =>
+      apiFetch("/api/profile", { method: "PUT", body: JSON.stringify(data) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["profile"] }),
+  });
+}
+
+// ─── Contact Attachments Hooks ──────────────────────────
+
+export function useContactAttachments(contactId: number | null) {
+  return useQuery<any[]>({
+    queryKey: ["contact-attachments", contactId],
+    queryFn: () => apiFetch(`/api/contacts/${contactId}/attachments`),
+    enabled: !!contactId,
+  });
+}
+
+export function useCreateContactNote(contactId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateContactAttachmentInput) =>
+      apiFetch(`/api/contacts/${contactId}/attachments`, { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["contact-attachments", contactId] }),
+  });
+}
+
+export function useUploadContactFile(contactId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ file, title }: { file: File; title?: string }) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      if (title) formData.append("title", title);
+      const res = await fetch(`/api/contacts/${contactId}/attachments`, { method: "POST", body: formData });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || "Upload failed");
+      return json.data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["contact-attachments", contactId] }),
+  });
+}
+
+export function useDeleteContactAttachment(contactId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (attachmentId: number) =>
+      apiFetch(`/api/contacts/${contactId}/attachments?attachmentId=${attachmentId}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["contact-attachments", contactId] }),
   });
 }

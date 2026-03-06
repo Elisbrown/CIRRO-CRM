@@ -38,6 +38,13 @@ const STATUS_STYLES: Record<string, string> = {
   PRINTING_PARTNER: "bg-gray-900 text-white border-black",
   MAINTENANCE: "bg-gray-100 text-gray-700 border-gray-200",
   CLEANING_SUPPLIES: "bg-gray-50 text-gray-700 border-gray-200",
+  PLUMBER: "bg-blue-50 text-blue-700 border-blue-100",
+  CARPENTRY: "bg-orange-50 text-orange-700 border-orange-100",
+  ELECTRICITY: "bg-yellow-50 text-yellow-700 border-yellow-100",
+  PAINTING: "bg-purple-50 text-purple-700 border-purple-100",
+  HVAC: "bg-cyan-50 text-cyan-700 border-cyan-100",
+  SECURITY: "bg-red-50 text-red-700 border-red-100",
+  IT_SERVICES: "bg-indigo-50 text-indigo-700 border-indigo-100",
   OTHER: "bg-gray-100 text-gray-600 border-gray-200",
   // Execution types
   IN_HOUSE: "bg-gray-50 text-gray-700 border-gray-200",

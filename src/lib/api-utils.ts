@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { ZodError } from "zod";
+import { z, ZodError } from "zod";
 import { Prisma } from "@prisma/client";
 
 /**
@@ -71,21 +71,25 @@ function formatZodErrors(error: ZodError): string {
       ? issue.path.map((p) => String(p).replace(/_/g, " ")).join(" → ")
       : "input";
 
-    switch (issue.code) {
-      case "invalid_type":
-        if (issue.received === "undefined" || issue.received === "null") {
+    switch ((issue as any).code) {
+      case "invalid_type": {
+        const _issue = issue as any;
+        if (_issue.received === "undefined" || _issue.received === "null") {
           return `${field} is required`;
         }
-        return `${field} must be a valid ${issue.expected}`;
+        return `${field} must be a valid ${_issue.expected}`;
+      }
       case "too_small":
         return `${field} is required`;
       case "too_big":
         return `${field} is too long`;
       case "invalid_enum_value":
         return `${field}: invalid option selected`;
-      case "invalid_string":
-        if (issue.validation === "email") return `Please enter a valid email address`;
+      case "invalid_string": {
+        const _issue = issue as any;
+        if (_issue.validation === "email") return `Please enter a valid email address`;
         return `${field} is not valid`;
+      }
       default:
         return `${field}: ${issue.message}`;
     }

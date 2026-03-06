@@ -27,8 +27,10 @@ export async function GET(req: NextRequest) {
       value: Number(s._sum.finalAmount || 0),
     }));
 
-    const totalRevenue = srStats.reduce((acc, s) => acc + Number(s._sum.finalAmount || 0), 0);
-    const totalCosts = srStats.reduce((acc, s) => 
+    // Only COMPLETED requests count as actual Revenue/Profit
+    const completedSRs = srStats.filter(s => s.status === 'COMPLETED');
+    const totalRevenue = completedSRs.reduce((acc, s) => acc + Number(s._sum.finalAmount || 0), 0);
+    const totalCosts = completedSRs.reduce((acc, s) => 
       acc + Number(s._sum.supplyCost || 0) + Number(s._sum.laborCost || 0) + Number(s._sum.outsourceCost || 0), 0);
 
     // 2. Machine Health
@@ -52,12 +54,6 @@ export async function GET(req: NextRequest) {
     // 5. Total Clients
     const totalClients = await db.contact.count();
 
-    // 6. Cleaning Quality Average
-    const cleaningAvg = await db.cleaningLog.aggregate({
-      _avg: { grade: true },
-      _count: true,
-    });
-
     return apiSuccess({
       overview: {
         totalRevenue,
@@ -68,10 +64,6 @@ export async function GET(req: NextRequest) {
       pipeline,
       machines: machineHealth.map(m => ({ status: m.status, count: m._count })),
       tasks: taskStats.map(t => ({ status: t.status, count: t._count })),
-      cleaning: {
-        avgGrade: cleaningAvg._avg.grade || 0,
-        totalLogs: cleaningAvg._count,
-      },
       totalClients,
       revenueTrend,
     });

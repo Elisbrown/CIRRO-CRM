@@ -4,34 +4,49 @@ import { NextResponse } from "next/server";
 /**
  * RBAC middleware — protects authenticated routes and API endpoints.
  * Maps system roles to allowed URL patterns.
+ *
+ * Roles:
+ *   MANAGER     — Full access (admin)
+ *   ACCOUNTANT  — Dashboard, CRM, Suppliers, Catalog, Rent
+ *   STAFF       — Tasks (default), CRM, Operations, Facility, Profile
  */
 
 const ROLE_ROUTES: Record<string, RegExp[]> = {
-  SUPER_ADMIN: [/.*/], // Full access
-  OPERATIONS_MANAGER: [
-    /^\/dashboard/,
-    /^\/tasks/,
-    /^\/maintenance/,
-    /^\/cleaning/,
-    /^\/suppliers/,
-    /^\/machines/,
-    /^\/staff/,
-    /^\/api\/(tasks|maintenance|cleaning|suppliers|machines|staff|search)/,
-  ],
-  SALES_REP: [
+  MANAGER: [/.*/], // Full access
+  ACCOUNTANT: [
     /^\/dashboard/,
     /^\/contacts/,
-    /^\/leads/,
     /^\/service-requests/,
-    /^\/api\/(contacts|service-requests|search|catalog)/,
-  ],
-  ASSISTANT: [
-    /^\/dashboard/,
+    /^\/kanban/,
+    /^\/suppliers/,
+    /^\/catalog/,
+    /^\/rent/,
     /^\/tasks/,
+    /^\/profile/,
+    /^\/messages/,
+    /^\/api\/(chat|contacts|service-requests|suppliers|catalog|rent|tasks|search|staff\/lookup|uploads|dashboard)/,
+  ],
+  STAFF: [
+    /^\/tasks/,
+    /^\/contacts/,
+    /^\/service-requests/,
+    /^\/kanban/,
+    /^\/catalog/,
     /^\/cleaning/,
     /^\/maintenance/,
-    /^\/api\/(tasks|cleaning|maintenance)/,
+    /^\/suppliers/,
+    /^\/profile/,
+    /^\/rent/,
+    /^\/messages/,
+    /^\/api\/(chat|tasks|contacts|service-requests|catalog|maintenance|suppliers|search|staff\/(lookup|upload)|uploads|rent|profile|machines)/,
   ],
+};
+
+/** Default landing page per role. */
+const DEFAULT_PAGES: Record<string, string> = {
+  MANAGER: "/dashboard",
+  ACCOUNTANT: "/dashboard",
+  STAFF: "/tasks",
 };
 
 export default auth((req) => {
@@ -43,6 +58,9 @@ export default auth((req) => {
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
+    pathname.match(/\.(png|jpg|jpeg|svg|ico)$/) ||
+    pathname.startsWith("/uploads") ||
+    pathname === "/sw.js" ||
     pathname === "/"
   ) {
     return NextResponse.next();
@@ -67,12 +85,14 @@ export default auth((req) => {
         { status: 403 }
       );
     }
-    return NextResponse.redirect(new URL("/dashboard", req.url));
+    // Redirect to default page for role
+    const defaultPage = DEFAULT_PAGES[role] || "/tasks";
+    return NextResponse.redirect(new URL(defaultPage, req.url));
   }
 
   return NextResponse.next();
 });
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|uploads|favicon.ico).*)"],
 };

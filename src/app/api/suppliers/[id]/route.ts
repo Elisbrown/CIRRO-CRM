@@ -1,16 +1,7 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { apiSuccess, apiError, handleValidationError } from "@/lib/api-utils";
-import { z } from "zod";
-
-const updateSupplierSchema = z.object({
-  name: z.string().min(1).max(200).optional(),
-  category: z.enum(["RAW_MATERIALS", "PRINTING_PARTNER", "MAINTENANCE", "CLEANING_SUPPLIES", "OTHER"]).optional(),
-  contactName: z.string().optional().nullable(),
-  phone: z.string().optional().nullable(),
-  email: z.string().email().optional().or(z.literal("")).nullable(),
-  bankDetails: z.string().optional().nullable(),
-});
+import { updateSupplierSchema } from "@/lib/validations";
 
 interface RouteContext {
   params: Promise<{ id: string }>;

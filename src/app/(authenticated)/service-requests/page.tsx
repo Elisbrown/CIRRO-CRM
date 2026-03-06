@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import {
   useServiceRequestsList,
   useCreateServiceRequest,
@@ -34,6 +34,18 @@ import {
 import { format } from "date-fns";
 
 export default function ServiceRequestsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-[400px] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+      </div>
+    }>
+      <ServiceRequestsContent />
+    </Suspense>
+  );
+}
+
+function ServiceRequestsContent() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
@@ -56,7 +68,7 @@ export default function ServiceRequestsPage() {
   const { data: contacts } = useContactsLookup();
   const { data: catalog } = useCatalogList();
   const { data: machines } = useMachinesList();
-  const { data: staffLookup } = useStaffLookup();
+  const { data: staffLookup = [] } = useStaffLookup();
   const { data: suppliers } = useSuppliersLookup();
 
   const searchParams = useSearchParams();
@@ -250,7 +262,14 @@ export default function ServiceRequestsPage() {
       {/* Create/Edit SR Drawer */}
       <SRDrawer
         open={drawerOpen}
-        onClose={() => { setDrawerOpen(false); setEditingSR(null); }}
+        onClose={() => {
+          setDrawerOpen(false);
+          setEditingSR(null);
+          // Clear edit param from URL
+          const url = new URL(window.location.href);
+          url.searchParams.delete("edit");
+          window.history.pushState({}, "", url);
+        }}
         editingSR={editingSR}
         contacts={contacts || []}
         catalog={catalog || []}
@@ -355,7 +374,7 @@ function SRDrawer({
       setFormData(defaultFormData);
       setReferral(null);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingSR]);
 
   function onChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
@@ -606,10 +625,9 @@ function SRDrawer({
             <div className="mt-3 flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2">
               <TrendingUp className="h-4 w-4 text-emerald-500" />
               <span className="text-sm text-gray-600">Net Profit:</span>
-              <span className={`text-sm font-bold ${
-                (parseFloat(formData.finalAmount) || 0) - (parseFloat(formData.supplyCost) || 0) - (parseFloat(formData.outsourceCost) || 0) - (parseFloat(formData.laborCost) || 0) >= 0
+              <span className={`text-sm font-bold ${(parseFloat(formData.finalAmount) || 0) - (parseFloat(formData.supplyCost) || 0) - (parseFloat(formData.outsourceCost) || 0) - (parseFloat(formData.laborCost) || 0) >= 0
                   ? "text-emerald-600" : "text-red-600"
-              }`}>
+                }`}>
                 XAF {((parseFloat(formData.finalAmount) || 0) - (parseFloat(formData.supplyCost) || 0) - (parseFloat(formData.outsourceCost) || 0) - (parseFloat(formData.laborCost) || 0)).toLocaleString()}
               </span>
             </div>

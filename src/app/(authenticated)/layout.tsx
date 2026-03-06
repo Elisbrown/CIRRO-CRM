@@ -12,15 +12,15 @@ export default function AuthenticatedLayout({
   const sidebarOpen = useUIStore((s) => s.sidebarOpen);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50" suppressHydrationWarning>
       <Sidebar />
       <div
-        className={`transition-all duration-300 ease-in-out ${
-          sidebarOpen ? "md:ml-64" : "md:ml-[68px]"
-        }`}
+        className={`transition-all duration-300 ease-in-out ${sidebarOpen ? "md:ml-64" : "md:ml-[68px]"
+          }`}
+        suppressHydrationWarning
       >
         <TopBar />
-        <main className="p-4 md:p-6">{children}</main>
+        <main className="p-4 md:p-6" suppressHydrationWarning>{children}</main>
       </div>
     </div>
   );

@@ -20,14 +20,14 @@ export async function GET(req: NextRequest) {
 
     const where: Prisma.StaffWhereInput = search
       ? {
-          OR: [
-            { firstName: { contains: search } },
-            { lastName: { contains: search } },
-            { email: { contains: search } },
-            { staffId: { contains: search } },
-            { phone: { contains: search } },
-          ],
-        }
+        OR: [
+          { firstName: { contains: search } },
+          { lastName: { contains: search } },
+          { email: { contains: search } },
+          { staffId: { contains: search } },
+          { phone: { contains: search } },
+        ],
+      }
       : {};
 
     const [staff, total] = await Promise.all([
@@ -43,6 +43,7 @@ export async function GET(req: NextRequest) {
           department: true,
           role: true,
           status: true,
+          avatarUrl: true,
           createdAt: true,
         },
         orderBy: { [sortBy]: sortOrder },
@@ -97,9 +98,23 @@ export async function POST(req: NextRequest) {
         department: true,
         role: true,
         status: true,
+        avatarUrl: true,
         createdAt: true,
       },
     });
+
+    // Auto-join to #General group (ID: 1)
+    try {
+      await db.chatGroupMember.create({
+        data: {
+          groupId: 1,
+          staffId: staff.id,
+          isAdmin: staff.role === "MANAGER"
+        }
+      });
+    } catch (e) {
+      console.error("Failed to auto-join staff to General group:", e);
+    }
 
     return apiSuccess(staff, 201);
   } catch (error) {

@@ -46,6 +46,7 @@ function QueryErrorBridge({ children, queryClient }: { children: ReactNode; quer
   return <>{children}</>;
 }
 
+
 export function Providers({ children }: ProvidersProps) {
   const [queryClient] = useState(
     () =>
@@ -53,6 +54,7 @@ export function Providers({ children }: ProvidersProps) {
         defaultOptions: {
           queries: {
             staleTime: 60 * 1000, // 1 minute
+            refetchInterval: 30000, // Background refresh every 30s
             refetchOnWindowFocus: false,
             // We disable retry by default to avoid multiple toasts for the same error
             retry: false,

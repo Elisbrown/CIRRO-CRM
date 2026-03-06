@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useStaffList, useCreateStaff, useDeleteStaff } from "@/hooks/use-data";
+import { useStaffList, useCreateStaff, useDeleteStaff, useStaffDetail, useUpdateStaff } from "@/hooks/use-data";
 import { Pagination } from "@/components/ui/Pagination";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { SlideDrawer } from "@/components/ui/SlideDrawer";
@@ -22,22 +22,31 @@ export default function StaffPage() {
   const [search, setSearch] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [searchInput, setSearchInput] = useState("");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [selectedStaffId, setSelectedStaffId] = useState<number | null>(null);
+  const [detailDrawerOpen, setDetailDrawerOpen] = useState(false);
 
   const { data, isLoading } = useStaffList({ page, search, limit: 25 });
+  const { data: staffDetail, isLoading: isLoadingDetail } = useStaffDetail(selectedStaffId);
   const createMutation = useCreateStaff();
   const deleteMutation = useDeleteStaff();
+  const updateMutation = useUpdateStaff(selectedStaffId || 0);
 
   const form = useForm<CreateStaffInput>({
-    resolver: zodResolver(createStaffSchema),
+    resolver: zodResolver(createStaffSchema) as any,
     defaultValues: {
       firstName: "",
       lastName: "",
       email: "",
       phone: "",
       department: "ADMIN",
-      role: "ASSISTANT",
+      role: "STAFF",
       password: "",
     },
+  });
+
+  const editForm = useForm<CreateStaffInput>({
+    resolver: zodResolver(createStaffSchema) as any,
   });
 
   function handleSearch() {
@@ -46,9 +55,30 @@ export default function StaffPage() {
   }
 
   async function handleCreate(data: CreateStaffInput) {
-    await createMutation.mutateAsync(data);
+    const res = await createMutation.mutateAsync(data) as any;
+    if (avatarFile && res.id) {
+       const formData = new FormData();
+       formData.append("file", avatarFile);
+       formData.append("staffId", String(res.id));
+       await fetch("/api/staff/upload", { method: "POST", body: formData });
+    }
     setDrawerOpen(false);
+    setAvatarFile(null);
     form.reset();
+  }
+
+  async function handleUpdate(data: CreateStaffInput) {
+    if (!selectedStaffId) return;
+    await updateMutation.mutateAsync(data as any);
+    if (avatarFile) {
+       const formData = new FormData();
+       formData.append("file", avatarFile);
+       formData.append("staffId", String(selectedStaffId));
+       await fetch("/api/staff/upload", { method: "POST", body: formData });
+    }
+    setDetailDrawerOpen(false);
+    setSelectedStaffId(null);
+    setAvatarFile(null);
   }
 
   return (
@@ -62,7 +92,11 @@ export default function StaffPage() {
           </p>
         </div>
         <button
-          onClick={() => setDrawerOpen(true)}
+          onClick={() => {
+            form.reset();
+            setAvatarFile(null);
+            setDrawerOpen(true);
+          }}
           className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-900"
         >
           <Plus className="h-4 w-4" />
@@ -92,23 +126,23 @@ export default function StaffPage() {
       </div>
 
       {/* Table */}
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-        <table className="w-full">
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <table className="w-full text-left">
           <thead>
-            <tr className="border-b border-gray-200 bg-gray-50">
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+            <tr className="border-b border-gray-100 bg-gray-50/50">
+              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
                 Employee
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
                 Email
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
                 Department
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
                 Role
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
                 Status
               </th>
               <th className="w-12 px-4 py-3" />
@@ -131,18 +165,28 @@ export default function StaffPage() {
               data.items.map((s) => (
                 <tr
                   key={s.id}
-                  className="transition-colors hover:bg-gray-50/60"
+                  onClick={() => {
+                    setSelectedStaffId(s.id);
+                    setDetailDrawerOpen(true);
+                  }}
+                  className="cursor-pointer transition-colors hover:bg-gray-50/60"
                 >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700">
-                        {s.firstName[0]}{s.lastName[0]}
+                      <div className="h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-blue-100 shadow-sm border border-black/5">
+                        {s.avatarUrl ? (
+                          <img src={s.avatarUrl} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-blue-700">
+                            {s.firstName[0]}{s.lastName[0]}
+                          </div>
+                        )}
                       </div>
                       <div>
                         <p className="text-sm font-medium text-gray-900">
                           {s.firstName} {s.lastName}
                         </p>
-                        <p className="text-xs text-gray-400">{s.staffId}</p>
+                        <p className="text-[10px] text-gray-400 font-mono">{s.staffId}</p>
                       </div>
                     </div>
                   </td>
@@ -157,17 +201,19 @@ export default function StaffPage() {
                     <StatusBadge value={s.status} />
                   </td>
                   <td className="px-4 py-3">
-                    <button
-                      onClick={() => {
-                        if (confirm("Deactivate this staff member?")) {
-                          deleteMutation.mutate(s.id);
-                        }
-                      }}
-                      className="flex h-8 w-8 items-center justify-center rounded text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
-                      title="Deactivate"
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                    </button>
+                    <div onClick={(e) => e.stopPropagation()}>
+                       <button
+                        onClick={() => {
+                          if (confirm("Deactivate this staff member?")) {
+                            deleteMutation.mutate(s.id);
+                          }
+                        }}
+                        className="flex h-8 w-8 items-center justify-center rounded text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                        title="Deactivate"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -187,6 +233,110 @@ export default function StaffPage() {
         )}
       </div>
 
+      {/* Staff Detail Drawer */}
+      <SlideDrawer
+        open={detailDrawerOpen}
+        onClose={() => {
+          setDetailDrawerOpen(false);
+          setSelectedStaffId(null);
+          setAvatarFile(null);
+          editForm.reset();
+        }}
+        title="Staff Profile"
+      >
+        {isLoadingDetail || !staffDetail ? (
+          <div className="flex justify-center p-12">
+            <Loader2 className="h-8 w-8 animate-spin text-gray-300" />
+          </div>
+        ) : (
+          <div className="space-y-8">
+            {/* Profile Header */}
+            <div className="flex flex-col items-center gap-4 text-center">
+              <div className="relative group">
+                <div className="w-28 h-28 rounded-3xl bg-gray-50 border-2 border-dashed border-gray-200 flex items-center justify-center overflow-hidden shadow-sm">
+                  {avatarFile ? (
+                    <img src={URL.createObjectURL(avatarFile)} className="w-full h-full object-cover" />
+                  ) : staffDetail.avatarUrl ? (
+                    <img src={staffDetail.avatarUrl} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-3xl font-bold text-gray-300">
+                      {staffDetail.firstName[0]}{staffDetail.lastName[0]}
+                    </span>
+                  )}
+                </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setAvatarFile(e.target.files?.[0] || null)}
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                />
+                <div className="absolute inset-0 bg-black/40 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-3xl pointer-events-none">
+                  <Plus className="w-6 h-6" />
+                </div>
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">{staffDetail.firstName} {staffDetail.lastName}</h2>
+                <p className="text-sm text-gray-500">{staffDetail.staffId} • {staffDetail.email}</p>
+              </div>
+            </div>
+
+            {/* Performance Stats */}
+            <div className="grid grid-cols-3 gap-4">
+               <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 text-center">
+                  <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tight mb-1">Assigned</p>
+                  <p className="text-2xl font-black text-black">{staffDetail._count.assignedTasks}</p>
+               </div>
+               <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 text-center">
+                  <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tight mb-1">Completed</p>
+                  <p className="text-2xl font-black text-green-600">{staffDetail.completedTasksCount}</p>
+               </div>
+               <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 text-center">
+                  <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tight mb-1">Rate</p>
+                  <p className="text-2xl font-black text-blue-600">{staffDetail.performanceRate}%</p>
+               </div>
+            </div>
+
+            {/* Quick Actions / CRUD */}
+            <div className="space-y-4">
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest px-1">Details</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-white p-3 rounded-lg border border-gray-50 shadow-sm">
+                   <p className="text-[10px] text-gray-400 font-bold uppercase mb-0.5">Department</p>
+                   <p className="text-sm font-semibold">{staffDetail.department}</p>
+                </div>
+                <div className="bg-white p-3 rounded-lg border border-gray-50 shadow-sm">
+                   <p className="text-[10px] text-gray-400 font-bold uppercase mb-0.5">Role</p>
+                   <p className="text-sm font-semibold">{staffDetail.role}</p>
+                </div>
+                <div className="bg-white p-3 rounded-lg border border-gray-50 shadow-sm">
+                   <p className="text-[10px] text-gray-400 font-bold uppercase mb-0.5">Phone</p>
+                   <p className="text-sm font-semibold">{staffDetail.phone || "N/A"}</p>
+                </div>
+                <div className="bg-white p-3 rounded-lg border border-gray-50 shadow-sm">
+                   <p className="text-[10px] text-gray-400 font-bold uppercase mb-0.5">Status</p>
+                   <StatusBadge value={staffDetail.status} />
+                </div>
+              </div>
+            </div>
+
+            {/* Note: In a real app, you'd add an Edit Form here that populates with staffDetail */}
+            <div className="pt-6 border-t border-gray-100 flex gap-3">
+               <button
+                 onClick={() => {
+                   if (confirm("Save changes to profile and avatar?")) {
+                      handleUpdate(staffDetail as any);
+                   }
+                 }}
+                 disabled={updateMutation.isPending}
+                 className="flex-1 bg-black text-white py-2.5 rounded-xl text-sm font-bold transition-all hover:bg-gray-900 shadow-[0_4px_12px_rgba(0,0,0,0.1)] active:scale-[0.98] disabled:opacity-50"
+               >
+                 {updateMutation.isPending ? "Saving..." : "Save Profile Changes"}
+               </button>
+            </div>
+          </div>
+        )}
+      </SlideDrawer>
+
       {/* Create Staff Drawer */}
       <SlideDrawer
         open={drawerOpen}
@@ -197,6 +347,24 @@ export default function StaffPage() {
         title="Add Staff Member"
       >
         <form onSubmit={form.handleSubmit(handleCreate)} className="space-y-4">
+          <div className="flex flex-col items-center gap-4 py-6 border-b border-gray-100 mb-4 bg-gray-50/50 rounded-xl">
+             <div className="relative group">
+                <div className="w-24 h-24 rounded-2xl bg-white border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden">
+                  {avatarFile ? (
+                    <img src={URL.createObjectURL(avatarFile)} className="w-full h-full object-cover" />
+                  ) : (
+                    <Plus className="w-6 h-6 text-gray-300" />
+                  )}
+                </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setAvatarFile(e.target.files?.[0] || null)}
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                />
+             </div>
+             <p className="text-[10px] text-gray-500 font-medium uppercase">Profile Picture (Square preferred)</p>
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <FormField label="First Name" error={form.formState.errors.firstName?.message}>
               <input {...form.register("firstName")} className="form-input" placeholder="John" />
@@ -224,10 +392,9 @@ export default function StaffPage() {
             </FormField>
             <FormField label="Role" error={form.formState.errors.role?.message}>
               <select {...form.register("role")} className="form-input">
-                <option value="ASSISTANT">Assistant</option>
-                <option value="SALES_REP">Sales Rep</option>
-                <option value="OPERATIONS_MANAGER">Ops Manager</option>
-                <option value="SUPER_ADMIN">Super Admin</option>
+                <option value="STAFF">Staff</option>
+                <option value="ACCOUNTANT">Accountant</option>
+                <option value="MANAGER">Manager</option>
               </select>
             </FormField>
           </div>

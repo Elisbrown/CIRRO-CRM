@@ -13,6 +13,7 @@ declare module "next-auth" {
       name: string;
       role: SystemRole;
       department: string;
+      image: string | null;
     };
   }
 
@@ -20,6 +21,7 @@ declare module "next-auth" {
     staffId: string;
     role: SystemRole;
     department: string;
+    image: string | null;
   }
 }
 
@@ -28,6 +30,7 @@ declare module "next-auth" {
     staffId: string;
     role: SystemRole;
     department: string;
+    image: string | null;
   }
 }
 
@@ -49,9 +52,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        const staff = await db.staff.findUnique({
+        const staff = (await db.staff.findUnique({
           where: { email: credentials.email as string },
-        });
+        })) as any;
 
         if (!staff || staff.status !== "ACTIVE") return null;
 
@@ -68,6 +71,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: `${staff.firstName} ${staff.lastName}`,
           role: staff.role,
           department: staff.department,
+          image: staff.avatarUrl,
         };
       },
     }),
@@ -78,6 +82,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.staffId = user.staffId;
         token.role = user.role;
         token.department = user.department;
+        token.image = user.image;
       }
       return token;
     },
@@ -87,6 +92,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.staffId = token.staffId as string;
         session.user.role = token.role as SystemRole;
         session.user.department = token.department as string;
+        session.user.image = token.image as string | null;
       }
       return session;
     },

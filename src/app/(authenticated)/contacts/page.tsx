@@ -57,6 +57,7 @@ export default function ContactsPage() {
       country: "",
       leadSource: "",
       status: "NEW",
+      notes: "",
     },
   });
 
@@ -78,6 +79,7 @@ export default function ContactsPage() {
       country: "",
       leadSource: "",
       status: "NEW",
+      notes: "",
     });
     setDrawerOpen(true);
   }
@@ -96,6 +98,7 @@ export default function ContactsPage() {
       leadSource: contact.leadSource || "",
       status: contact.status || "NEW",
       assignedTo: contact.assignedTo || undefined,
+      notes: contact.notes || "",
     });
     setDrawerOpen(true);
   }
@@ -373,6 +376,9 @@ export default function ContactsPage() {
               </select>
             </FormField>
           </div>
+          <FormField label="Notes" error={form.formState.errors.notes?.message}>
+            <textarea {...form.register("notes")} className="form-input h-24 resize-none" placeholder="Brief notes about this contact..." />
+          </FormField>
 
           {(createMutation.error || updateMutation.error) && (
             <p className="text-sm text-red-600">{(createMutation.error || updateMutation.error)?.message}</p>

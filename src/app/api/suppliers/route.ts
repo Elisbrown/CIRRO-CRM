@@ -5,17 +5,8 @@ import {
   parsePaginationParams,
   handleValidationError,
 } from "@/lib/api-utils";
-import { z } from "zod";
+import { createSupplierSchema } from "@/lib/validations";
 import { Prisma } from "@prisma/client";
-
-const createSupplierSchema = z.object({
-  name: z.string().min(1, "Name is required").max(200),
-  category: z.enum(["RAW_MATERIALS", "PRINTING_PARTNER", "MAINTENANCE", "CLEANING_SUPPLIES", "OTHER"]),
-  contactName: z.string().optional().nullable(),
-  phone: z.string().optional().nullable(),
-  email: z.string().email().optional().or(z.literal("")).nullable(),
-  bankDetails: z.string().optional().nullable(),
-});
 
 /**
  * GET /api/suppliers — List with pagination, search, category filter.

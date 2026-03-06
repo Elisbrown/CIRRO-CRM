@@ -16,10 +16,9 @@ enum Department {
 }
 
 enum SystemRole {
-  SUPER_ADMIN
-  OPERATIONS_MANAGER
-  SALES_REP
-  ASSISTANT
+  MANAGER
+  ACCOUNTANT
+  STAFF
 }
 
 enum ContactType {
@@ -40,6 +39,13 @@ enum SupplierCategory {
   PRINTING_PARTNER
   MAINTENANCE
   CLEANING_SUPPLIES
+  PLUMBER
+  CARPENTRY
+  ELECTRICITY
+  PAINTING
+  HVAC
+  SECURITY
+  IT_SERVICES
   OTHER
 }
 
@@ -78,6 +84,7 @@ enum TaskStatus {
   TODO
   DOING
   BLOCKED
+  PENDING_APPROVAL
   DONE
 }
 
@@ -87,17 +94,6 @@ enum MachineStatus {
   DOWN
 }
 
-enum CleaningZone {
-  JOYSUN_FLOOR
-  OFFIZONE_MAIN
-  BATHROOMS
-  OTHER
-}
-
-enum CleaningResult {
-  PASS
-  FAIL
-}
 
 enum MaintenanceStatus {
   OPERATIONAL
@@ -110,6 +106,24 @@ enum StaffStatus {
   INACTIVE
 }
 
+enum RecurringInterval {
+  DAILY
+  WEEKLY
+  MONTHLY
+  CUSTOM
+}
+
+enum RentalSpaceStatus {
+  AVAILABLE
+  OCCUPIED
+  UNDER_MAINTENANCE
+}
+
+enum ContactAttachmentType {
+  NOTE
+  FILE
+}
+
 // ─── Models ─────────────────────────────────────────────
 
 model Staff {
@@ -120,19 +134,174 @@ model Staff {
   email        String       @unique
   phone        String?
   department   Department
-  role         SystemRole   @default(ASSISTANT)
+  role         SystemRole   @default(STAFF)
   status       StaffStatus  @default(ACTIVE)
   passwordHash String       @map("password_hash")
+  avatarUrl    String?      @map("avatar_url")
+  bio          String?      @db.Text
+  address      String?
   createdAt    DateTime     @default(now()) @map("created_at")
   updatedAt    DateTime     @updatedAt @map("updated_at")
 
   // Relations
-  assignedContacts Contact[]       @relation("AssignedRep")
-  assignedTasks    Task[]          @relation("TaskAssignee")
-  cleaningLogs     CleaningLog[]
-  activities       Activity[]
+  assignedContacts   Contact[]          @relation("AssignedRep")
+  assignedTasks      Task[]             @relation("TaskAssignee")
+  createdTasks       Task[]             @relation("TaskCreator")
+  approvedTasks      Task[]             @relation("TaskApprover")
+  activities         Activity[]
+  taskLogs           TaskLog[]
+  taskAttachments    TaskAttachment[]
+  contactAttachments ContactAttachment[]
+  assignedSRs        ServiceRequest[]   @relation("SRAssignee")
+
+  // Chat Relations
+  createdGroups      ChatGroup[]        @relation("GroupCreator")
+  groupMemberships   ChatGroupMember[]
+  sentMessages       ChatMessage[]      @relation("MessageSender")
+  receivedMessages   ChatMessage[]      @relation("MessageReceiver")
+  reactions          ChatMessageReaction[]
+  pollVotes          ChatPollVote[]
 
   @@map("staff")
+}
+
+model ChatGroup {
+  id           Int           @id @default(autoincrement())
+  name         String
+  description  String?       @db.Text
+  avatarUrl    String?       @map("avatar_url")
+  isPrivate    Boolean       @default(false) @map("is_private")
+  creatorId    Int?          @map("creator_id")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  members      ChatGroupMember[]
+  messages     ChatMessage[]
+  creator      Staff?        @relation("GroupCreator", fields: [creatorId], references: [id])
+
+  @@map("chat_groups")
+}
+
+model ChatGroupMember {
+  id        Int      @id @default(autoincrement())
+  groupId   Int      @map("group_id")
+  staffId   Int      @map("staff_id")
+  isAdmin   Boolean  @default(false) @map("is_admin")
+  joinedAt  DateTime @default(now()) @map("joined_at")
+  lastReadAt DateTime @default(now()) @map("last_read_at")
+
+  // Relations
+  group     ChatGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  staff     Staff     @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, staffId])
+  @@map("chat_group_members")
+}
+
+model ChatDirectRead {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  partnerId Int      @map("partner_id")
+  lastReadAt DateTime @default(now()) @map("last_read_at")
+
+  @@unique([userId, partnerId])
+  @@map("chat_direct_read")
+}
+
+model ChatMessage {
+  id               Int      @id @default(autoincrement())
+  groupId          Int?     @map("group_id")
+  senderId         Int      @map("sender_id")
+  receiverId       Int?     @map("receiver_id") // For direct messages
+  content          String   @db.Text
+  parentMessageId  Int?     @map("parent_message_id")
+  pollId           Int?     @map("poll_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  // Relations
+  group           ChatGroup?       @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  sender          Staff            @relation("MessageSender", fields: [senderId], references: [id])
+  receiver        Staff?           @relation("MessageReceiver", fields: [receiverId], references: [id])
+  parentMessage   ChatMessage?     @relation("Thread", fields: [parentMessageId], references: [id], onDelete: SetNull)
+  replies         ChatMessage[]    @relation("Thread")
+  attachments     ChatMessageAttachment[]
+  reactions       ChatMessageReaction[]
+  poll            ChatPoll?        @relation(fields: [pollId], references: [id])
+
+  @@index([groupId])
+  @@index([senderId])
+  @@index([receiverId])
+  @@map("chat_messages")
+}
+
+model ChatMessageReaction {
+  id         Int      @id @default(autoincrement())
+  messageId  Int      @map("message_id")
+  staffId    Int      @map("staff_id")
+  emoji      String
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relations
+  message    ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  staff      Staff       @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, staffId, emoji])
+  @@map("chat_message_reactions")
+}
+
+model ChatPoll {
+  id          Int      @id @default(autoincrement())
+  question    String
+  isMultiple  Boolean  @default(false) @map("is_multiple")
+  expiresAt   DateTime? @map("expires_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  options     ChatPollOption[]
+  messages    ChatMessage[]
+
+  @@map("chat_polls")
+}
+
+model ChatPollOption {
+  id      Int      @id @default(autoincrement())
+  pollId  Int      @map("poll_id")
+  text    String
+  
+  // Relations
+  poll    ChatPoll @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  votes   ChatPollVote[]
+
+  @@map("chat_poll_options")
+}
+
+model ChatPollVote {
+  id       Int      @id @default(autoincrement())
+  optionId Int      @map("option_id")
+  staffId  Int      @map("staff_id")
+  
+  // Relations
+  option   ChatPollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  staff    Staff          @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@unique([optionId, staffId])
+  @@map("chat_poll_votes")
+}
+
+model ChatMessageAttachment {
+  id        Int      @id @default(autoincrement())
+  messageId Int      @map("message_id")
+  fileName  String   @map("file_name")
+  fileUrl   String   @map("file_url")
+  fileSize  Int      @map("file_size")
+  mimeType  String   @map("mime_type")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@map("chat_message_attachments")
 }
 
 model Contact {
@@ -149,13 +318,15 @@ model Contact {
   leadSource  String?      @map("lead_source")
   status      LeadStatus   @default(NEW)
   assignedTo  Int?         @map("assigned_to")
+  notes       String?      @db.Text
   createdAt   DateTime     @default(now()) @map("created_at")
   updatedAt   DateTime     @updatedAt @map("updated_at")
 
   // Relations
-  assignedRep     Staff?           @relation("AssignedRep", fields: [assignedTo], references: [id])
+  assignedRep     Staff?              @relation("AssignedRep", fields: [assignedTo], references: [id])
   serviceRequests ServiceRequest[]
   activities      Activity[]
+  attachments     ContactAttachment[]
 
   @@index([email])
   @@index([phone])
@@ -211,39 +382,41 @@ model Machine {
 }
 
 model ServiceRequest {
-  id             Int                  @id @default(autoincrement())
-  requestId      String               @unique @map("request_id") // SR-0001
-  contactId      Int                  @map("contact_id")
-  businessUnit   BusinessUnit         @map("business_unit")
-  serviceId      Int?                 @map("service_id")
-  executionType  ExecutionType        @default(IN_HOUSE) @map("execution_type")
-  machineId      Int?                 @map("machine_id")
-  supplierId     Int?                 @map("supplier_id")
-  referralId     Int?                 @map("referral_id")
-  referralType   ReferralType?        @map("referral_type")
-  quotedAmount   Decimal?             @map("quoted_amount") @db.Decimal(12, 2)
-  finalAmount    Decimal?             @map("final_amount") @db.Decimal(12, 2)
-  supplyCost     Decimal              @default(0) @map("supply_cost") @db.Decimal(12, 2)
-  outsourceCost  Decimal              @default(0) @map("outsource_cost") @db.Decimal(12, 2)
-  laborCost      Decimal              @default(0) @map("labor_cost") @db.Decimal(12, 2)
-  status         ServiceRequestStatus @default(DRAFT)
-  notes          String?              @db.Text
-  deliveryDate   DateTime?            @map("delivery_date")
-  createdAt      DateTime             @default(now()) @map("created_at")
-  updatedAt      DateTime             @updatedAt @map("updated_at")
+  id                Int                  @id @default(autoincrement())
+  requestId         String               @unique @map("request_id") // SR-0001
+  contactId         Int                  @map("contact_id")
+  businessUnit      BusinessUnit         @map("business_unit")
+  serviceId         Int?                 @map("service_id")
+  executionType     ExecutionType        @default(IN_HOUSE) @map("execution_type")
+  machineId         Int?                 @map("machine_id")
+  supplierId        Int?                 @map("supplier_id")
+  referralId        Int?                 @map("referral_id")
+  referralType      ReferralType?        @map("referral_type")
+  assignedToStaffId Int?                 @map("assigned_to_staff_id")
+  quotedAmount      Decimal?             @map("quoted_amount") @db.Decimal(12, 2)
+  finalAmount       Decimal?             @map("final_amount") @db.Decimal(12, 2)
+  supplyCost        Decimal              @default(0) @map("supply_cost") @db.Decimal(12, 2)
+  outsourceCost     Decimal              @default(0) @map("outsource_cost") @db.Decimal(12, 2)
+  laborCost         Decimal              @default(0) @map("labor_cost") @db.Decimal(12, 2)
+  status            ServiceRequestStatus @default(DRAFT)
+  notes             String?              @db.Text
+  deliveryDate      DateTime?            @map("delivery_date")
+  createdAt         DateTime             @default(now()) @map("created_at")
+  updatedAt         DateTime             @updatedAt @map("updated_at")
 
   // Print job–specific fields (JOYSUN)
-  paperSize      String?              @map("paper_size")    // A4, A3, A2, Custom
-  colorMode      String?              @map("color_mode")    // CMYK, BW, Spot
+  paperSize      String?              @map("paper_size")
+  colorMode      String?              @map("color_mode")
   quantity       Int?                 @default(1)
-  finishType     String?              @map("finish_type")   // Lamination, Binding, Folding, None
+  finishType     String?              @map("finish_type")
 
   // Relations
-  contact     Contact          @relation(fields: [contactId], references: [id])
-  service     Catalog?         @relation(fields: [serviceId], references: [id])
-  machine     Machine?         @relation(fields: [machineId], references: [id])
-  supplier    Supplier?        @relation(fields: [supplierId], references: [id])
-  attachments FileAttachment[]
+  contact       Contact          @relation(fields: [contactId], references: [id])
+  service       Catalog?         @relation(fields: [serviceId], references: [id])
+  machine       Machine?         @relation(fields: [machineId], references: [id])
+  supplier      Supplier?        @relation(fields: [supplierId], references: [id])
+  assignedStaff Staff?           @relation("SRAssignee", fields: [assignedToStaffId], references: [id])
+  attachments   FileAttachment[]
 
   @@index([status])
   @@index([businessUnit])
@@ -268,25 +441,91 @@ model FileAttachment {
 }
 
 model Task {
-  id              Int          @id @default(autoincrement())
-  title           String
-  description     String?      @db.Text
-  assignedTo      Int?         @map("assigned_to")
-  priority        TaskPriority @default(MEDIUM)
-  status          TaskStatus   @default(TODO)
-  dueDate         DateTime?    @map("due_date")
-  relatedRecordId Int?         @map("related_record_id")
-  relatedType     String?      @map("related_type") // "Contact" | "ServiceRequest"
-  createdAt       DateTime     @default(now()) @map("created_at")
-  updatedAt       DateTime     @updatedAt @map("updated_at")
+  id                Int               @id @default(autoincrement())
+  title             String
+  description       String?           @db.Text
+  assignedTo        Int?              @map("assigned_to")
+  createdById       Int?              @map("created_by_id")
+  approvedById      Int?              @map("approved_by_id")
+  approvedAt        DateTime?         @map("approved_at")
+  completedAt       DateTime?         @map("completed_at")
+  priority          TaskPriority      @default(MEDIUM)
+  status            TaskStatus        @default(TODO)
+  dueDate           DateTime?         @map("due_date")
+  relatedRecordId   Int?              @map("related_record_id")
+  relatedType       String?           @map("related_type") // "Contact" | "ServiceRequest"
+  isRecurring       Boolean           @default(false) @map("is_recurring")
+  isGeneral         Boolean           @default(false) @map("is_general")
+  recurringInterval RecurringInterval? @map("recurring_interval")
+  recurringDays     Int?              @map("recurring_days") // for CUSTOM interval
+  recurringParentId Int?              @map("recurring_parent_id")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
 
   // Relations
-  assignee Staff?        @relation("TaskAssignee", fields: [assignedTo], references: [id])
-  comments TaskComment[]
+  assignee          Staff?          @relation("TaskAssignee", fields: [assignedTo], references: [id])
+  creator           Staff?          @relation("TaskCreator", fields: [createdById], references: [id])
+  approver          Staff?          @relation("TaskApprover", fields: [approvedById], references: [id])
+  recurringParent   Task?           @relation("RecurringTask", fields: [recurringParentId], references: [id])
+  recurringChildren Task[]          @relation("RecurringTask")
+  comments          TaskComment[]
+  subTasks          SubTask[]
+  attachments       TaskAttachment[]
+  logs              TaskLog[]
 
   @@index([status])
   @@index([assignedTo])
+  @@index([createdById])
   @@map("tasks")
+}
+
+model SubTask {
+  id          Int      @id @default(autoincrement())
+  taskId      Int      @map("task_id")
+  title       String
+  isCompleted Boolean  @default(false) @map("is_completed")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@map("sub_tasks")
+}
+
+model TaskAttachment {
+  id           Int      @id @default(autoincrement())
+  taskId       Int      @map("task_id")
+  fileName     String   @map("file_name")
+  fileUrl      String   @map("file_url")
+  fileSize     Int      @map("file_size")
+  mimeType     String   @map("mime_type")
+  uploadedById Int?     @map("uploaded_by_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relations
+  task       Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploadedBy Staff? @relation(fields: [uploadedById], references: [id])
+
+  @@index([taskId])
+  @@map("task_attachments")
+}
+
+model TaskLog {
+  id            Int      @id @default(autoincrement())
+  taskId        Int      @map("task_id")
+  action        String   // "CREATED", "STATUS_CHANGED", "ASSIGNED", "COMMENT_ADDED", "APPROVED", etc.
+  details       String?  @db.Text
+  performedById Int?     @map("performed_by_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  // Relations
+  task        Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  performedBy Staff? @relation(fields: [performedById], references: [id])
+
+  @@index([taskId])
+  @@map("task_logs")
 }
 
 model TaskComment {
@@ -302,21 +541,6 @@ model TaskComment {
   @@map("task_comments")
 }
 
-model CleaningLog {
-  id             Int            @id @default(autoincrement())
-  staffId        Int            @map("staff_id")
-  zone           CleaningZone
-  result         CleaningResult @default(PASS)
-  grade          Int            @default(3) // 1-5
-  deduction      Decimal        @default(0) @db.Decimal(12, 2)
-  inspectorNotes String?        @map("inspector_notes") @db.Text
-  createdAt      DateTime       @default(now()) @map("created_at")
-
-  // Relations
-  cleaner Staff @relation(fields: [staffId], references: [id])
-
-  @@map("cleaning_logs")
-}
 
 model MaintenanceLog {
   id        Int               @id @default(autoincrement())
@@ -346,4 +570,68 @@ model Activity {
 
   @@index([contactId])
   @@map("activities")
+}
+
+// ─── Rent Tracking ──────────────────────────────────────
+
+model RentalSpace {
+  id          Int               @id @default(autoincrement())
+  name        String
+  type        String            // "Office", "Shop", "Warehouse", "Parking", etc.
+  location    String?
+  monthlyRent Decimal           @map("monthly_rent") @db.Decimal(12, 2)
+  status      RentalSpaceStatus @default(AVAILABLE)
+  tenantName  String?           @map("tenant_name")
+  tenantPhone String?           @map("tenant_phone")
+  tenantEmail String?           @map("tenant_email")
+  notes       String?           @db.Text
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  payments RentPayment[]
+
+  @@map("rental_spaces")
+}
+
+model RentPayment {
+  id            Int      @id @default(autoincrement())
+  spaceId       Int      @map("space_id")
+  amount        Decimal  @db.Decimal(12, 2)
+  paidAt        DateTime @map("paid_at")
+  periodStart   DateTime @map("period_start")
+  periodEnd     DateTime @map("period_end")
+  paymentMethod String?  @map("payment_method") // "Cash", "Bank Transfer", "Mobile Money"
+  receiptNumber String?  @map("receipt_number")
+  notes         String?  @db.Text
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  // Relations
+  space RentalSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+  @@index([spaceId])
+  @@map("rent_payments")
+}
+
+// ─── Contact Attachments ────────────────────────────────
+
+model ContactAttachment {
+  id           Int                   @id @default(autoincrement())
+  contactId    Int                   @map("contact_id")
+  type         ContactAttachmentType @default(NOTE)
+  title        String?
+  content      String?               @db.Text // for NOTE type
+  fileName     String?               @map("file_name") // for FILE type
+  fileUrl      String?               @map("file_url")
+  fileSize     Int?                  @map("file_size")
+  mimeType     String?               @map("mime_type")
+  uploadedById Int?                  @map("uploaded_by_id")
+  createdAt    DateTime              @default(now()) @map("created_at")
+
+  // Relations
+  contact    Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  uploadedBy Staff?  @relation(fields: [uploadedById], references: [id])
+
+  @@index([contactId])
+  @@map("contact_attachments")
 }

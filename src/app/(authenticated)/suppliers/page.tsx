@@ -89,6 +89,13 @@ export default function SuppliersPage() {
           <option value="PRINTING_PARTNER">Printing Partner</option>
           <option value="MAINTENANCE">Maintenance</option>
           <option value="CLEANING_SUPPLIES">Cleaning Supplies</option>
+          <option value="PLUMBER">Plumber</option>
+          <option value="CARPENTRY">Carpentry</option>
+          <option value="ELECTRICITY">Electricity</option>
+          <option value="PAINTING">Painting</option>
+          <option value="HVAC">HVAC</option>
+          <option value="SECURITY">Security</option>
+          <option value="IT_SERVICES">IT Services</option>
           <option value="OTHER">Other</option>
         </select>
       </div>
@@ -156,6 +163,13 @@ export default function SuppliersPage() {
               <option value="PRINTING_PARTNER">Printing Partner</option>
               <option value="MAINTENANCE">Maintenance</option>
               <option value="CLEANING_SUPPLIES">Cleaning Supplies</option>
+              <option value="PLUMBER">Plumber</option>
+              <option value="CARPENTRY">Carpentry</option>
+              <option value="ELECTRICITY">Electricity</option>
+              <option value="PAINTING">Painting</option>
+              <option value="HVAC">HVAC</option>
+              <option value="SECURITY">Security</option>
+              <option value="IT_SERVICES">IT Services</option>
               <option value="OTHER">Other</option>
             </select>
           </div>
