@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
   try {
     const { page, limit, search, sortBy, sortOrder, skip } = parsePaginationParams(req);
     const category = new URL(req.url).searchParams.get("category");
+    const isServiceProvider = new URL(req.url).searchParams.get("isServiceProvider");
 
     const where: Prisma.SupplierWhereInput = {};
     if (search) {
@@ -25,6 +26,7 @@ export async function GET(req: NextRequest) {
       ];
     }
     if (category) where.category = category as Prisma.EnumSupplierCategoryFilter["equals"];
+    if (isServiceProvider) where.isServiceProvider = isServiceProvider === "true";
 
     const [items, total] = await Promise.all([
       db.supplier.findMany({

@@ -128,6 +128,13 @@ export function useDeleteStaff() {
   });
 }
 
+export function useResetStaffPassword() {
+  return useMutation({
+    mutationFn: (data: { staffId: number; newPassword: string }) =>
+      apiFetch("/api/staff/reset-password", { method: "POST", body: JSON.stringify(data) }),
+  });
+}
+
 // ─── Contacts Hooks ─────────────────────────────────────
 
 interface ContactListItem {
@@ -386,6 +393,7 @@ export function useSuppliersList(params: {
   limit?: number;
   search?: string;
   category?: string;
+  isServiceProvider?: string;
   sortBy?: string;
   sortOrder?: string;
 }) {
@@ -394,6 +402,7 @@ export function useSuppliersList(params: {
   if (params.limit) qs.set("limit", String(params.limit));
   if (params.search) qs.set("search", params.search);
   if (params.category) qs.set("category", params.category);
+  if (params.isServiceProvider) qs.set("isServiceProvider", params.isServiceProvider);
   if (params.sortBy) qs.set("sortBy", params.sortBy);
   if (params.sortOrder) qs.set("sortOrder", params.sortOrder);
 
@@ -435,6 +444,28 @@ export function useSuppliersLookup() {
     queryKey: ["suppliers-lookup"],
     queryFn: () => apiFetch("/api/suppliers/lookup"),
     staleTime: 2 * 60 * 1000,
+  });
+}
+
+// ─── Jobs Hooks ──────────────────────────────────────────
+
+export function useJobLogs(supplierId: number | null) {
+  return useQuery<any[]>({
+    queryKey: ["jobs", supplierId],
+    queryFn: () => apiFetch(`/api/jobs?supplierId=${supplierId}`),
+    enabled: !!supplierId,
+  });
+}
+
+export function useCreateJobLog() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { supplierId: number; description: string; cost: number; jobDate?: string }) =>
+      apiFetch("/api/jobs", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: ["jobs", variables.supplierId] });
+      qc.invalidateQueries({ queryKey: ["suppliers"] });
+    },
   });
 }
 

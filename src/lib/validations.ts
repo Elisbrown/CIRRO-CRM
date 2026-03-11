@@ -94,6 +94,7 @@ export const createSupplierSchema = z.object({
   contactName: z.string().optional().nullable(),
   phone: z.string().optional().nullable(),
   email: z.string().email().optional().or(z.literal("")).nullable(),
+  isServiceProvider: z.boolean().default(false),
   bankDetails: z.string().optional().nullable(),
 });
 

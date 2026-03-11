@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useStaffList, useCreateStaff, useDeleteStaff, useStaffDetail, useUpdateStaff } from "@/hooks/use-data";
+import { useStaffList, useCreateStaff, useDeleteStaff, useStaffDetail, useUpdateStaff, useResetStaffPassword } from "@/hooks/use-data";
 import { Pagination } from "@/components/ui/Pagination";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { SlideDrawer } from "@/components/ui/SlideDrawer";
@@ -15,6 +15,7 @@ import {
   MoreHorizontal,
   Trash2,
   Loader2,
+  Lock,
 } from "lucide-react";
 
 export default function StaffPage() {
@@ -25,12 +26,15 @@ export default function StaffPage() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [selectedStaffId, setSelectedStaffId] = useState<number | null>(null);
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false);
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
 
   const { data, isLoading } = useStaffList({ page, search, limit: 25 });
   const { data: staffDetail, isLoading: isLoadingDetail } = useStaffDetail(selectedStaffId);
   const createMutation = useCreateStaff();
   const deleteMutation = useDeleteStaff();
   const updateMutation = useUpdateStaff(selectedStaffId || 0);
+  const resetPasswordMutation = useResetStaffPassword();
 
   const form = useForm<CreateStaffInput>({
     resolver: zodResolver(createStaffSchema) as any,
@@ -79,6 +83,18 @@ export default function StaffPage() {
     setDetailDrawerOpen(false);
     setSelectedStaffId(null);
     setAvatarFile(null);
+  }
+
+  async function handleResetPassword() {
+    if (!selectedStaffId || !newPassword) return;
+    try {
+      await resetPasswordMutation.mutateAsync({ staffId: selectedStaffId, newPassword });
+      alert("Password has been reset successfully.");
+      setResetModalOpen(false);
+      setNewPassword("");
+    } catch (e: any) {
+      alert(e.message || "Failed to reset password");
+    }
   }
 
   return (
@@ -200,8 +216,18 @@ export default function StaffPage() {
                   <td className="px-4 py-3">
                     <StatusBadge value={s.status} />
                   </td>
-                  <td className="px-4 py-3">
-                    <div onClick={(e) => e.stopPropagation()}>
+                   <td className="px-4 py-3">
+                    <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-1">
+                      <button
+                        onClick={() => {
+                          setSelectedStaffId(s.id);
+                          setResetModalOpen(true);
+                        }}
+                        className="flex h-8 w-8 items-center justify-center rounded text-gray-400 transition-colors hover:bg-gray-100 hover:text-black"
+                        title="Reset Password"
+                      >
+                        <Lock className="h-4 w-4" />
+                      </button>
                        <button
                         onClick={() => {
                           if (confirm("Deactivate this staff member?")) {
@@ -336,6 +362,45 @@ export default function StaffPage() {
           </div>
         )}
       </SlideDrawer>
+
+      {/* Password Reset Modal */}
+      {resetModalOpen && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+            <h3 className="text-lg font-bold text-gray-900">Reset Password</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              Enter a new password for this staff member.
+            </p>
+            <div className="mt-4">
+              <input
+                type="password"
+                placeholder="New password (min 6 chars)"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-black focus:outline-none"
+              />
+            </div>
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={handleResetPassword}
+                disabled={resetPasswordMutation.isPending || newPassword.length < 6}
+                className="flex-1 rounded-xl bg-black py-2.5 text-sm font-bold text-white transition-all hover:bg-gray-900 disabled:opacity-50"
+              >
+                {resetPasswordMutation.isPending ? "Resetting..." : "Reset Password"}
+              </button>
+              <button
+                onClick={() => {
+                    setResetModalOpen(false);
+                    setNewPassword("");
+                }}
+                className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Create Staff Drawer */}
       <SlideDrawer

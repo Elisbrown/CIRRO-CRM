@@ -161,6 +161,7 @@ model Staff {
   receivedMessages   ChatMessage[]      @relation("MessageReceiver")
   reactions          ChatMessageReaction[]
   pollVotes          ChatPollVote[]
+  jobLogs            JobLog[]
 
   @@map("staff")
 }
@@ -341,12 +342,14 @@ model Supplier {
   contactName String?          @map("contact_name")
   phone       String?
   email       String?
+  isServiceProvider Boolean          @default(false) @map("is_service_provider")
   bankDetails String?          @map("bank_details") @db.Text
   createdAt   DateTime         @default(now()) @map("created_at")
   updatedAt   DateTime         @updatedAt @map("updated_at")
 
   // Relations
   serviceRequests ServiceRequest[]
+  jobLogs         JobLog[]
 
   @@map("suppliers")
 }
@@ -634,4 +637,21 @@ model ContactAttachment {
 
   @@index([contactId])
   @@map("contact_attachments")
+}
+
+model JobLog {
+  id           Int      @id @default(autoincrement())
+  supplierId   Int      @map("supplier_id")
+  description  String   @db.Text
+  cost         Decimal  @default(0) @db.Decimal(12, 2)
+  loggedById   Int      @map("logged_by_id")
+  jobDate      DateTime @default(now()) @map("job_date")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relations
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  loggedBy Staff    @relation(fields: [loggedById], references: [id])
+
+  @@index([supplierId])
+  @@map("job_logs")
 }

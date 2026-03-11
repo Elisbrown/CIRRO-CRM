@@ -9,7 +9,8 @@ import {
 import { Pagination } from "@/components/ui/Pagination";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { SlideDrawer } from "@/components/ui/SlideDrawer";
-import { Plus, Search, Loader2, Trash2 } from "lucide-react";
+import { Plus, Search, Loader2, Trash2, ClipboardList, History, HardHat } from "lucide-react";
+import { useJobLogs, useCreateJobLog, useUpdateSupplier } from "@/hooks/use-data";
 
 export default function SuppliersPage() {
   const [page, setPage] = useState(1);
@@ -17,11 +18,16 @@ export default function SuppliersPage() {
   const [searchInput, setSearchInput] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"SUPPLIERS" | "SERVICE_PROVIDERS">("SUPPLIERS");
+  const [jobDrawerOpen, setJobDrawerOpen] = useState(false);
+  const [selectedSupplierId, setSelectedSupplierId] = useState<number | null>(null);
+  const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
 
   const { data, isLoading } = useSuppliersList({
     page,
     search,
     category: categoryFilter || undefined,
+    isServiceProvider: activeTab === "SERVICE_PROVIDERS" ? "true" : "false",
     limit: 25,
   });
 
@@ -35,6 +41,7 @@ export default function SuppliersPage() {
     phone: "",
     email: "",
     bankDetails: "",
+    isServiceProvider: false,
   });
 
   function onChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
@@ -50,20 +57,64 @@ export default function SuppliersPage() {
       phone: formData.phone || null,
       email: formData.email || null,
       bankDetails: formData.bankDetails || null,
+      isServiceProvider: formData.isServiceProvider,
     });
     setDrawerOpen(false);
-    setFormData({ name: "", category: "RAW_MATERIALS", contactName: "", phone: "", email: "", bankDetails: "" });
+    setFormData({ name: "", category: "RAW_MATERIALS", contactName: "", phone: "", email: "", bankDetails: "", isServiceProvider: false });
+  }
+
+  const { data: jobLogs, isLoading: isLoadingJobs } = useJobLogs(selectedSupplierId);
+  const createJobMutation = useCreateJobLog();
+  const updateSupplierMutation = useUpdateSupplier(selectedSupplierId || 0);
+
+  const [jobData, setJobData] = useState({ description: "", cost: 0, jobDate: new Date().toISOString().split("T")[0] });
+
+  async function handleLogJob(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedSupplierId) return;
+    await createJobMutation.mutateAsync({
+        supplierId: selectedSupplierId,
+        ...jobData
+    });
+    setJobDrawerOpen(false);
+    setJobData({ description: "", cost: 0, jobDate: new Date().toISOString().split("T")[0] });
   }
 
   return (
     <div>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Suppliers</h1>
-          <p className="mt-1 text-sm text-gray-500">Manage vendors and outsourcing partners</p>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {activeTab === "SUPPLIERS" ? "Suppliers" : "Service Providers"}
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            {activeTab === "SUPPLIERS" 
+              ? "Manage vendors and raw material suppliers" 
+              : "Track maintenance professionals and outsource partners"}
+          </p>
         </div>
-        <button onClick={() => setDrawerOpen(true)} className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-gray-900">
-          <Plus className="h-4 w-4" /> Add Supplier
+        <button onClick={() => {
+            setFormData(prev => ({ ...prev, isServiceProvider: activeTab === "SERVICE_PROVIDERS" }));
+            setDrawerOpen(true);
+        }} className="inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-gray-900">
+          <Plus className="h-4 w-4" /> Add {activeTab === "SUPPLIERS" ? "Supplier" : "Provider"}
+        </button>
+      </div>
+
+      {/* Tabs */}
+      <div className="mb-6 flex border-b border-gray-200">
+        <button
+          onClick={() => { setActiveTab("SUPPLIERS"); setPage(1); }}
+          className={`px-6 py-3 text-sm font-bold transition-colors ${activeTab === "SUPPLIERS" ? "border-b-2 border-black text-black" : "text-gray-400 hover:text-gray-600"}`}
+        >
+          Suppliers
+        </button>
+        <button
+          onClick={() => { setActiveTab("SERVICE_PROVIDERS"); setPage(1); }}
+          className={`flex items-center gap-2 px-6 py-3 text-sm font-bold transition-colors ${activeTab === "SERVICE_PROVIDERS" ? "border-b-2 border-black text-black" : "text-gray-400 hover:text-gray-600"}`}
+        >
+          <HardHat className="w-4 h-4" />
+          Service Providers
         </button>
       </div>
 
@@ -132,12 +183,32 @@ export default function SuppliersPage() {
                       {s._count?.serviceRequests ?? 0}
                     </td>
                     <td className="px-4 py-3">
-                      <button
-                        onClick={() => { if (confirm("Delete this supplier?")) deleteMutation.mutate(s.id as number); }}
-                        className="flex h-8 w-8 items-center justify-center rounded text-gray-400 hover:bg-red-50 hover:text-red-500"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                       <div className="flex items-center gap-1 justify-end">
+                        {activeTab === "SERVICE_PROVIDERS" && (
+                          <>
+                            <button
+                              onClick={() => { setSelectedSupplierId(s.id); setJobDrawerOpen(true); }}
+                              className="flex h-8 w-8 items-center justify-center rounded text-blue-500 hover:bg-blue-50"
+                              title="Log Job"
+                            >
+                              <ClipboardList className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => { setSelectedSupplierId(s.id); setHistoryDrawerOpen(true); }}
+                              className="flex h-8 w-8 items-center justify-center rounded text-green-500 hover:bg-green-50"
+                              title="Job History"
+                            >
+                              <History className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
+                        <button
+                          onClick={() => { if (confirm("Delete this supplier?")) deleteMutation.mutate(s.id as number); }}
+                          className="flex h-8 w-8 items-center justify-center rounded text-gray-400 hover:bg-red-50 hover:text-red-500"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -173,6 +244,19 @@ export default function SuppliersPage() {
               <option value="OTHER">Other</option>
             </select>
           </div>
+          <div className="flex items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 p-3">
+            <input 
+              type="checkbox" 
+              id="isServiceProvider"
+              name="isServiceProvider" 
+              checked={formData.isServiceProvider} 
+              onChange={(e) => setFormData(p => ({ ...p, isServiceProvider: e.target.checked }))}
+              className="h-4 w-4 rounded border-gray-300 text-black focus:ring-black"
+            />
+            <label htmlFor="isServiceProvider" className="text-sm font-semibold text-gray-700 cursor-pointer">
+              This is a Service Provider (Mechanic, Plumber, etc.)
+            </label>
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">Contact Person</label>
@@ -200,6 +284,72 @@ export default function SuppliersPage() {
             <button type="button" onClick={() => setDrawerOpen(false)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
           </div>
         </form>
+      </SlideDrawer>
+
+      {/* Log Job Drawer */}
+      <SlideDrawer open={jobDrawerOpen} onClose={() => setJobDrawerOpen(false)} title="Log New Job">
+         <form onSubmit={handleLogJob} className="space-y-4">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">Description of Work</label>
+              <textarea 
+                required 
+                rows={3}
+                value={jobData.description} 
+                onChange={(e) => setJobData(p => ({ ...p, description: e.target.value }))}
+                className="form-input" 
+                placeholder="e.g. Fixed leaking pipe in Block A"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">Cost (FCFA)</label>
+                <input 
+                  type="number" 
+                  value={jobData.cost} 
+                  onChange={(e) => setJobData(p => ({ ...p, cost: parseFloat(e.target.value) }))}
+                  className="form-input"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">Job Date</label>
+                <input 
+                  type="date" 
+                  value={jobData.jobDate} 
+                  onChange={(e) => setJobData(p => ({ ...p, jobDate: e.target.value }))}
+                  className="form-input"
+                />
+              </div>
+            </div>
+            <button 
+              type="submit" 
+              disabled={createJobMutation.isPending}
+              className="w-full rounded-xl bg-black py-3 text-sm font-bold text-white hover:bg-gray-900 disabled:opacity-50"
+            >
+              {createJobMutation.isPending ? "Logging..." : "Log Job"}
+            </button>
+         </form>
+      </SlideDrawer>
+
+      {/* Job History Drawer */}
+      <SlideDrawer open={historyDrawerOpen} onClose={() => setHistoryDrawerOpen(false)} title="Job History">
+         {isLoadingJobs ? (
+            <div className="flex justify-center p-12"><Loader2 className="h-6 w-6 animate-spin text-gray-300" /></div>
+         ) : !jobLogs?.length ? (
+            <p className="py-12 text-center text-sm text-gray-400">No jobs logged yet</p>
+         ) : (
+            <div className="space-y-4">
+              {jobLogs.map((job: any) => (
+                <div key={job.id} className="rounded-xl border border-gray-100 bg-gray-50 p-4 shadow-sm">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{new Date(job.jobDate).toLocaleDateString()}</p>
+                    <p className="text-sm font-black text-blue-600">{job.cost.toLocaleString()} FCFA</p>
+                  </div>
+                  <p className="text-sm text-gray-700 leading-relaxed">{job.description}</p>
+                  <p className="mt-3 text-[10px] text-gray-400 font-medium italic">Logged by {job.loggedBy.firstName} {job.loggedBy.lastName}</p>
+                </div>
+              ))}
+            </div>
+         )}
       </SlideDrawer>
     </div>
   );
