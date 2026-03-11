@@ -4,7 +4,6 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
 import { useUIStore } from "@/stores/ui-store";
 import { VideoCallProvider } from "@/contexts/video-call-context";
-import { IncomingCallModal } from "@/components/chat/IncomingCallModal";
 import { CallOverlay } from "@/components/chat/CallOverlay";
 
 export default function AuthenticatedLayout({
@@ -26,7 +25,6 @@ export default function AuthenticatedLayout({
           <TopBar />
           <main className="p-4 md:p-6" suppressHydrationWarning>{children}</main>
         </div>
-        <IncomingCallModal />
         <CallOverlay />
       </div>
     </VideoCallProvider>
