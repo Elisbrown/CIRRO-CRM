@@ -44,8 +44,8 @@ function LoginForm() {
   return (
     <div className="flex min-h-screen">
       {/* Left Panel - Branding */}
-      <div className="hidden w-1/2 flex-col justify-between bg-black p-12 lg:flex">
-        <div className="flex items-center gap-3">
+      <div className="hidden w-1/2 flex-col justify-between bg-black p-12 lg:flex" suppressHydrationWarning>
+        <div className="flex items-center gap-3" suppressHydrationWarning>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="Cirronyx" className="h-10 brightness-0 invert" />
         </div>
