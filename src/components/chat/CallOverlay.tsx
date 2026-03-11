@@ -9,7 +9,7 @@ export function CallOverlay() {
         callState, 
         localStream, 
         remoteStream, 
-        endCall, 
+        leaveMeeting, 
         toggleMute, 
         toggleVideo, 
         isMuted, 
@@ -32,7 +32,7 @@ export function CallOverlay() {
         }
     }, [remoteStream]);
 
-    if (callState === 'idle' || callState === 'ringing' || callState === 'rejected') return null;
+    if (callState === 'idle') return null;
 
     return (
         <div className="fixed inset-0 bg-slate-950 z-[250] flex flex-col animate-in fade-in duration-500">
@@ -108,9 +108,9 @@ export function CallOverlay() {
                 </button>
 
                 <button
-                    onClick={endCall}
+                    onClick={leaveMeeting}
                     className="p-5 md:p-6 bg-red-600 text-white rounded-full hover:bg-red-700 transition-all active:scale-75 shadow-xl shadow-red-900/40"
-                    title="End Meeting"
+                    title="Leave Meeting"
                 >
                     <PhoneOff className="h-7 w-7 md:h-8 md:w-8" />
                 </button>
