@@ -42,14 +42,14 @@ function LoginForm() {
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen" suppressHydrationWarning>
       {/* Left Panel - Branding */}
       <div className="hidden w-1/2 flex-col justify-between bg-black p-12 lg:flex" suppressHydrationWarning>
         <div className="flex items-center gap-3" suppressHydrationWarning>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="Cirronyx" className="h-10 brightness-0 invert" />
         </div>
-        <div>
+        <div suppressHydrationWarning>
           <h1 className="text-4xl font-bold leading-tight text-white">
             Unified Operations
             <br />
@@ -67,10 +67,10 @@ function LoginForm() {
       </div>
 
       {/* Right Panel - Login Form */}
-      <div className="flex w-full items-center justify-center px-6 lg:w-1/2">
-        <div className="w-full max-w-md">
+      <div className="flex w-full items-center justify-center px-6 lg:w-1/2" suppressHydrationWarning>
+        <div className="w-full max-w-md" suppressHydrationWarning>
           {/* Mobile logo */}
-          <div className="mb-8 flex items-center gap-3 lg:hidden">
+          <div className="mb-8 flex items-center gap-3 lg:hidden" suppressHydrationWarning>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo.png" alt="Cirronyx" className="h-10" />
           </div>
@@ -88,14 +88,14 @@ function LoginForm() {
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-5">
             {/* Email */}
-            <div>
+            <div suppressHydrationWarning>
               <label
                 htmlFor="email"
                 className="mb-1.5 block text-sm font-medium text-gray-700"
               >
                 Email address
               </label>
-              <div className="relative">
+              <div className="relative" suppressHydrationWarning>
                 <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <input
                   id="email"
@@ -110,14 +110,14 @@ function LoginForm() {
             </div>
 
             {/* Password */}
-            <div>
+            <div suppressHydrationWarning>
               <label
                 htmlFor="password"
                 className="mb-1.5 block text-sm font-medium text-gray-700"
               >
                 Password
               </label>
-              <div className="relative">
+              <div className="relative" suppressHydrationWarning>
                 <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <input
                   id="password"
