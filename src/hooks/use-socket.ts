@@ -124,6 +124,14 @@ export function useSocket() {
         if (socket) socket.emit("end-call", data);
     }, [socket]);
 
+    const emitJoinMeeting = useCallback((data: { meetingId: string, userId: string, userName: string }) => {
+        if (socket) socket.emit("join-meeting", data);
+    }, [socket]);
+
+    const emitMeetingSignal = useCallback((data: { to: string, signal: any, from: string }) => {
+        if (socket) socket.emit("meeting-signal", data);
+    }, [socket]);
+
     return {
         socket,
         isConnected,
@@ -140,5 +148,7 @@ export function useSocket() {
         emitIceCandidate,
         emitRejectCall,
         emitEndCall,
+        emitJoinMeeting,
+        emitMeetingSignal,
     };
 }

@@ -57,7 +57,7 @@ export function CallOverlay() {
                 )}
 
                 {/* Local Picture-in-Picture */}
-                <div className="absolute top-6 right-6 w-32 md:w-48 aspect-video bg-slate-800 rounded-xl overflow-hidden border-2 border-slate-700 shadow-2xl z-30 group">
+                <div className="absolute top-4 right-4 md:top-6 md:right-6 w-24 md:w-48 aspect-video bg-slate-800 rounded-xl overflow-hidden border-2 border-slate-700 shadow-2xl z-30 group transition-all">
                     {localStream && !isVideoOff ? (
                         <video 
                             ref={localVideoRef} 
@@ -68,48 +68,51 @@ export function CallOverlay() {
                         />
                     ) : (
                         <div className="w-full h-full flex items-center justify-center bg-slate-800">
-                            <VideoOff className="h-6 w-6 text-slate-600" />
+                            <VideoOff className="h-5 w-5 md:h-6 md:w-6 text-slate-600" />
                         </div>
                     )}
                 </div>
 
                 {/* Remote Info Overlay */}
-                <div className="absolute top-6 left-6 text-white z-10">
-                    <h3 className="text-lg font-bold drop-shadow-md">{remoteUserName || "Searching..." }</h3>
-                    <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="text-xs text-slate-300 drop-shadow-md uppercase tracking-widest font-bold">
-                            {callState === 'connected' ? 'Secure LAN Call' : 'Encrypted Signal'}
+                <div className="absolute top-4 left-4 md:top-6 md:left-6 text-white z-10 px-2 py-1 bg-black/20 backdrop-blur-sm rounded-lg">
+                    <h3 className="text-sm md:text-lg font-bold drop-shadow-md truncate max-w-[120px] md:max-w-none">
+                        {remoteUserName || "Waiting..." }
+                    </h3>
+                    <div className="flex items-center gap-1 md:gap-2">
+                        <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-[8px] md:text-xs text-slate-300 drop-shadow-md uppercase tracking-widest font-bold">
+                            {callState === 'connected' ? 'Secure' : 'Signaling'}
                         </span>
                     </div>
                 </div>
             </div>
 
             {/* Controls Bar */}
-            <div className="h-24 bg-slate-900/80 backdrop-blur-xl flex items-center justify-center gap-4 md:gap-8 px-6 border-t border-slate-800/50">
+            <div className="h-20 md:h-24 bg-slate-900/80 backdrop-blur-xl flex items-center justify-center gap-6 md:gap-8 px-6 border-t border-slate-800/50 pb-safe">
                 <button
                     onClick={toggleMute}
-                    className={`p-4 rounded-full transition-all active:scale-90 ${
+                    className={`p-4 md:p-5 rounded-full transition-all active:scale-75 shadow-lg ${
                         isMuted ? 'bg-red-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                     }`}
                 >
-                    {isMuted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
+                    {isMuted ? <MicOff className="h-6 w-6 md:h-7 md:w-7" /> : <Mic className="h-6 w-6 md:h-7 md:w-7" />}
                 </button>
 
                 <button
                     onClick={toggleVideo}
-                    className={`p-4 rounded-full transition-all active:scale-90 ${
+                    className={`p-4 md:p-5 rounded-full transition-all active:scale-75 shadow-lg ${
                         isVideoOff ? 'bg-red-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                     }`}
                 >
-                    {isVideoOff ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
+                    {isVideoOff ? <VideoOff className="h-6 w-6 md:h-7 md:w-7" /> : <Video className="h-6 w-6 md:h-7 md:w-7" />}
                 </button>
 
                 <button
                     onClick={endCall}
-                    className="p-4 bg-red-600 text-white rounded-full hover:bg-red-700 transition-all active:scale-90 shadow-lg shadow-red-900/20"
+                    className="p-5 md:p-6 bg-red-600 text-white rounded-full hover:bg-red-700 transition-all active:scale-75 shadow-xl shadow-red-900/40"
+                    title="End Meeting"
                 >
-                    <PhoneOff className="h-6 w-6" />
+                    <PhoneOff className="h-7 w-7 md:h-8 md:w-8" />
                 </button>
             </div>
         </div>

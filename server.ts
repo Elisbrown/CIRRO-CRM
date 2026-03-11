@@ -147,6 +147,29 @@ app.prepare().then(() => {
             });
         });
 
+        // Meeting Room Signaling (Google Meet Style)
+        socket.on("join-meeting", (data: { meetingId: string, userId: string, userName: string }) => {
+            const meetingRoom = `meeting-${data.meetingId}`;
+            socket.join(meetingRoom);
+            console.log(`User ${data.userId} joined meeting ${data.meetingId}`);
+            
+            // Notify others in the room
+            socket.to(meetingRoom).emit("user-joined-meeting", {
+                userId: data.userId,
+                userName: data.userName,
+                socketId: socket.id
+            });
+        });
+
+        socket.on("meeting-signal", (data: { to: string, signal: any, from: string }) => {
+            // Send signal to specific user in the meeting
+            socket.to(data.to).emit("meeting-signal", {
+                signal: data.signal,
+                from: data.from,
+                fromSocketId: socket.id
+            });
+        });
+
         socket.on("disconnect", () => {
             const userId = socketToUser.get(socket.id);
             if (userId) {

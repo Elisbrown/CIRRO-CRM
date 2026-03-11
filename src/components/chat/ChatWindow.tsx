@@ -335,29 +335,32 @@ export function ChatWindow({ onTagClick }: ChatWindowProps) {
                         )}
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
-                    {activeRoom.type === "user" && (
-                        <>
-                            <button
-                                onClick={() => startCall(activeRoom.id.toString(), 'audio')}
-                                className="p-2 hover:bg-gray-100 rounded-full text-gray-600 transition-colors"
-                                title="Audio Call"
-                            >
-                                <Phone className="h-5 w-5" />
-                            </button>
-                            <button
-                                onClick={() => startCall(activeRoom.id.toString(), 'video')}
-                                className="p-2 hover:bg-gray-100 rounded-full text-gray-600 transition-colors"
-                                title="Video Call"
-                            >
-                                <Video className="h-5 w-5" />
-                            </button>
-                        </>
-                    )}
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                    <button
+                        onClick={() => {
+                            const meetingId = Math.random().toString(36).substring(7);
+                            sendMessage(`I've started a video meeting. Join here: [MEETING:${meetingId}:video]`, []);
+                        }}
+                        className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-full text-gray-600 transition-colors shrink-0"
+                        title="Share Video Meeting"
+                    >
+                        <Video className="h-5 w-5" />
+                    </button>
+                    <button
+                        onClick={() => {
+                            const meetingId = Math.random().toString(36).substring(7);
+                            sendMessage(`I've started an audio meeting. Join here: [MEETING:${meetingId}:audio]`, []);
+                        }}
+                        className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-full text-gray-600 transition-colors shrink-0"
+                        title="Share Audio Meeting"
+                    >
+                        <Phone className="h-5 w-5" />
+                    </button>
+                    
                     {activeRoom.type === "group" && (
                         <button
                             onClick={() => setShowPollModal(true)}
-                            className="text-xs font-bold text-gray-500 hover:text-black transition-colors flex items-center gap-1 border border-gray-200 px-2 py-1 rounded"
+                            className="hidden sm:flex text-xs font-bold text-gray-500 hover:text-black transition-colors items-center gap-1 border border-gray-200 px-2 py-1 rounded shrink-0"
                         >
                             <Plus className="h-3 w-3" />
                             Create Poll
@@ -487,9 +490,9 @@ export function ChatWindow({ onTagClick }: ChatWindowProps) {
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="leading-relaxed">
-                                                {renderContent(msg.content, onTagClick)}
-                                            </div>
+                                            <div className="leading-relaxed whitespace-pre-wrap break-words">
+                                            {renderContent(msg.content, onTagClick, startMeeting)}
+                                        </div>
                                         )}
 
                                         {/* Poll Display */}
@@ -716,88 +719,86 @@ export function ChatWindow({ onTagClick }: ChatWindowProps) {
                     <ForwardModal
                         onClose={() => setForwardingMsg(null)}
                         onForward={handleForward}
-                        groups={groups} // need to pass these
-                        staff={staff}   // need to pass these
+                        groups={groups}
+                        staff={staff}
                     />
                 )
             }
-        </div >
-    );
-}
-
-function ForwardModal({ onClose, onForward, groups, staff }: any) {
-    const [searchTerm, setSearchTerm] = useState("");
-    const filteredGroups = groups.filter((g: any) => g.name.toLowerCase().includes(searchTerm.toLowerCase()));
-    const filteredStaff = staff.filter((s: any) => `${s.firstName} ${s.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()));
-
-    return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110] p-4 font-outfit">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm flex flex-col max-h-[80vh]">
-                <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-                    <h3 className="font-bold">Forward Message</h3>
-                    <button onClick={onClose}><X className="h-4 w-4" /></button>
-                </div>
-                <div className="p-3">
-                    <input
-                        type="text"
-                        placeholder="Search..."
-                        className="w-full p-2 text-sm border border-gray-200 rounded"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                </div>
-                <div className="flex-1 overflow-y-auto p-2">
-                    <div className="mb-4">
-                        <h4 className="text-[10px] font-bold text-gray-400 uppercase px-2 mb-1">Channels</h4>
-                        <div className="space-y-1">
-                            {filteredGroups.map((g: any) => (
-                                <button
-                                    key={g.id}
-                                    onClick={() => onForward({ type: "group", id: g.id })}
-                                    className="w-full text-left p-2 hover:bg-gray-50 rounded text-sm flex items-center gap-2"
-                                >
-                                    <Hash className="h-4 w-4 text-gray-400" /> {g.name}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                    <div>
-                        <h4 className="text-[10px] font-bold text-gray-400 uppercase px-2 mb-1">Staff</h4>
-                        <div className="space-y-1">
-                            {filteredStaff.map((s: any) => (
-                                <button
-                                    key={s.id}
-                                    onClick={() => onForward({ type: "user", id: s.id })}
-                                    className="w-full text-left p-2 hover:bg-gray-50 rounded text-sm flex items-center gap-2"
-                                >
-                                    <User className="h-4 w-4 text-gray-400" /> {s.firstName} {s.lastName}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
     );
 }
 
-function renderContent(content: string, onTagClick: (cat: string, id: number) => void) {
-    // Regex to find tags like @[category:id](label)
+function renderContent(content: string, onTagClick: (cat: string, id: number) => void, onJoinMeeting?: (id: string, type: 'video' | 'audio') => void) {
+    // Meeting parsing: [MEETING:id:type]
+    const meetingRegex = /\[MEETING:(.*?):(video|audio)\]/g;
+    
+    // Tag parsing: @[category:id](label)
     const tagRegex = /@\[(.*?):(.*?)]\((.*?)\)/g;
-    const parts = [];
+    
+    let parts: any[] = [];
     let lastIndex = 0;
-    let match;
-
-    while ((match = tagRegex.exec(content)) !== null) {
-        // Text before match
-        if (match.index > lastIndex) {
-            parts.push(content.substring(lastIndex, match.index));
+    
+    // We combine regex search or handle them sequentially. Let's handle them one by one for simplicity if possible, or use a single replacement loop.
+    // For now, let's just handle them as replacements.
+    
+    const combinedContent = content;
+    
+    // Simple meeting link block
+    if (combinedContent.includes("[MEETING:")) {
+        const match = meetingRegex.exec(combinedContent);
+        if (match) {
+            const [full, meetingId, type] = match;
+            const before = combinedContent.split(full)[0];
+            const after = combinedContent.split(full)[1];
+            
+            return (
+                <div className="flex flex-col gap-2">
+                    {before && <span>{before}</span>}
+                    <div className="my-2 p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-col items-center gap-3 shadow-inner">
+                        <div className="flex items-center gap-2 text-slate-600 font-bold text-xs uppercase tracking-widest">
+                            {type === 'video' ? <Video className="h-4 w-4" /> : <Phone className="h-4 w-4" />}
+                            LAN Meeting Link
+                        </div>
+                        <button 
+                            onClick={() => onJoinMeeting?.(meetingId, type as 'video' | 'audio')}
+                            className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/10"
+                        >
+                            <Plus className="h-4 w-4" />
+                            Join Session
+                        </button>
+                    </div>
+                    {after && <span>{after}</span>}
+                </div>
+            );
         }
+    }
 
+    // Fallback to tag parsing
+    const parts_tag = [];
+    lastIndex = 0;
+    let match;
+    while ((match = tagRegex.exec(content)) !== null) {
+        if (match.index > lastIndex) {
+            parts_tag.push(content.substring(lastIndex, match.index));
+        }
         const [full, category, id, label] = match;
-        parts.push(
+        parts_tag.push(
             <button
                 key={`${category}-${id}-${match.index}`}
+                onClick={() => onTagClick(category, parseInt(id))}
+                className="text-blue-600 font-bold hover:underline bg-blue-50/50 px-1 rounded mx-0.5"
+            >
+                @{label}
+            </button>
+        );
+        lastIndex = tagRegex.lastIndex;
+    }
+    if (lastIndex < content.length) {
+        parts_tag.push(content.substring(lastIndex));
+    }
+
+    return parts_tag.length > 0 ? parts_tag : content;
+}
                 onClick={() => onTagClick(category, parseInt(id))}
                 className="text-blue-600 font-bold hover:underline bg-blue-50 px-1 rounded mx-0.5"
             >
