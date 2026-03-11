@@ -104,6 +104,26 @@ export function useSocket() {
         }
     }, [socket]);
 
+    const emitCallUser = useCallback((data: { to: string, offer: any, fromName: string, type: 'video' | 'audio' }) => {
+        if (socket) socket.emit("call-user", data);
+    }, [socket]);
+
+    const emitMakeAnswer = useCallback((data: { to: string, answer: any }) => {
+        if (socket) socket.emit("make-answer", data);
+    }, [socket]);
+
+    const emitIceCandidate = useCallback((data: { to: string, candidate: any }) => {
+        if (socket) socket.emit("ice-candidate", data);
+    }, [socket]);
+
+    const emitRejectCall = useCallback((data: { to: string }) => {
+        if (socket) socket.emit("reject-call", data);
+    }, [socket]);
+
+    const emitEndCall = useCallback((data: { to: string }) => {
+        if (socket) socket.emit("end-call", data);
+    }, [socket]);
+
     return {
         socket,
         isConnected,
@@ -115,5 +135,10 @@ export function useSocket() {
         emitStatusUpdate,
         emitMessageDeleted,
         emitMessageUpdated,
+        emitCallUser,
+        emitMakeAnswer,
+        emitIceCandidate,
+        emitRejectCall,
+        emitEndCall,
     };
 }

@@ -110,6 +110,43 @@ app.prepare().then(() => {
             io.emit("group-created", group);
         });
 
+        // WebRTC Signaling
+        socket.on("call-user", (data: { to: string, offer: any, fromName: string, type: 'video' | 'audio' }) => {
+            console.log(`Call from ${socketToUser.get(socket.id)} to ${data.to}`);
+            socket.to(`user-${data.to}`).emit("incoming-call", {
+                from: socketToUser.get(socket.id),
+                fromName: data.fromName,
+                offer: data.offer,
+                type: data.type
+            });
+        });
+
+        socket.on("make-answer", (data: { to: string, answer: any }) => {
+            socket.to(`user-${data.to}`).emit("call-answered", {
+                from: socketToUser.get(socket.id),
+                answer: data.answer
+            });
+        });
+
+        socket.on("ice-candidate", (data: { to: string, candidate: any }) => {
+            socket.to(`user-${data.to}`).emit("ice-candidate", {
+                from: socketToUser.get(socket.id),
+                candidate: data.candidate
+            });
+        });
+
+        socket.on("reject-call", (data: { to: string }) => {
+            socket.to(`user-${data.to}`).emit("call-rejected", {
+                from: socketToUser.get(socket.id)
+            });
+        });
+
+        socket.on("end-call", (data: { to: string }) => {
+            socket.to(`user-${data.to}`).emit("call-ended", {
+                from: socketToUser.get(socket.id)
+            });
+        });
+
         socket.on("disconnect", () => {
             const userId = socketToUser.get(socket.id);
             if (userId) {

@@ -2,11 +2,13 @@
 
 import { useChat, Message } from "@/contexts/chat-context";
 import { useEffect, useState, useRef } from "react";
-import { Send, Paperclip, Smile, Hash, User, Tag, X, Plus, MoreHorizontal, Reply, Edit, Trash2, Forward, Eye, Download, ChevronLeft } from "lucide-react";
+import { Send, Paperclip, Smile, Hash, User, Tag, X, Plus, MoreHorizontal, Reply, Edit, Trash2, Forward, Eye, Download, ChevronLeft, Video, Phone } from "lucide-react";
 import { TaggingInput } from "./TaggingInput";
 import { format } from "date-fns";
 import { FilePreviewer } from "@/components/ui/FilePreviewer";
 import { useSession } from "next-auth/react";
+
+import { useVideoCall } from "@/contexts/video-call-context";
 
 interface ChatWindowProps {
     onTagClick: (category: string, id: number) => void;
@@ -38,6 +40,8 @@ export function ChatWindow({ onTagClick }: ChatWindowProps) {
     const [previewFile, setPreviewFile] = useState<any>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const { startCall } = useVideoCall();
 
     const emojis = ["👍", "❤️", "😂", "😮", "😢", "🔥", "✅", "🙌", "✨", "🚀"];
 
@@ -332,6 +336,24 @@ export function ChatWindow({ onTagClick }: ChatWindowProps) {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
+                    {activeRoom.type === "user" && (
+                        <>
+                            <button
+                                onClick={() => startCall(activeRoom.id.toString(), 'audio')}
+                                className="p-2 hover:bg-gray-100 rounded-full text-gray-600 transition-colors"
+                                title="Audio Call"
+                            >
+                                <Phone className="h-5 w-5" />
+                            </button>
+                            <button
+                                onClick={() => startCall(activeRoom.id.toString(), 'video')}
+                                className="p-2 hover:bg-gray-100 rounded-full text-gray-600 transition-colors"
+                                title="Video Call"
+                            >
+                                <Video className="h-5 w-5" />
+                            </button>
+                        </>
+                    )}
                     {activeRoom.type === "group" && (
                         <button
                             onClick={() => setShowPollModal(true)}
